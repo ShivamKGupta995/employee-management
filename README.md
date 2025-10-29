@@ -27,6 +27,22 @@ This project uses Firebase. Local platform config files are intentionally not tr
 2. Download `google-services.json` for Android and place it at `android/app/google-services.json`.
 3. Download `GoogleService-Info.plist` for iOS and place it at `ios/Runner/GoogleService-Info.plist`.
 
+### Environment variables and local config
+
+To keep secrets out of version control we provide a sample env file. Copy `.env.sample` to `.env` and fill in the values for your local environment:
+
+```powershell
+cp .env.sample .env
+# then open .env and fill the values
+```
+
+Key points:
+- `google-services.json` (Android) -> place at `android/app/google-services.json`
+- `GoogleService-Info.plist` (iOS) -> place at `ios/Runner/GoogleService-Info.plist`
+- Do NOT commit these platform files or `.env` to git. The repo `.gitignore` already excludes them.
+
+If you accidentally pushed secrets, contact me and I can help remove them from the git history.
+
 If you need a template for local environment variables, add a `.env.sample` and never commit real `.env` files.
 
 Note: The repository's `.gitignore` already excludes these files. If you accidentally committed secrets, contact me and I can help remove them from git history safely.
