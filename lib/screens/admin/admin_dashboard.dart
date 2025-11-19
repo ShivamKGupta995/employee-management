@@ -1,3 +1,4 @@
+import 'package:employee_system/screens/admin/employee_list_monitor.dart';
 import 'package:employee_system/screens/login_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -31,6 +32,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     {'title': 'Notifications', 'icon': Icons.notifications_active_rounded},
     {'title': 'Attendance', 'icon': Icons.access_time_filled_rounded},
     {'title': 'Generate Salary', 'icon': Icons.attach_money_rounded},
+    {'title': 'Monitoring', 'icon': Icons.monitor_rounded},
     {'title': 'Reports', 'icon': Icons.bar_chart_rounded},
     {'title': 'Settings', 'icon': Icons.settings_rounded},
   ];
@@ -90,6 +92,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       const NotificationsScreen(),
       const AttendanceScreen(),
       const GenerateSalaryScreen(),
+      const EmployeeListMonitor(),
       const ReportsScreen(),
       const SettingsScreen(),
     ];

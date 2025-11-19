@@ -1,5 +1,6 @@
 import 'package:employee_system/screens/login_screen.dart';
 import 'package:employee_system/screens/notifications_screen.dart'; // Reuse your existing screen
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -20,6 +21,8 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
   @override
   void initState() {
     super.initState();
+    FirebaseMessaging.instance.subscribeToTopic('all_employees');
+
     _fetchUserDetails();
   }
 
