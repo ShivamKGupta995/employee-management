@@ -46,6 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = true);
 
     try {
+      // 1. Authenticate with Firebase Auth
       final userCredential = await _auth.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
@@ -53,6 +54,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final uid = userCredential.user!.uid;
 
+      // 2. Get User Role & Name from Firestore
       final userDoc = await FirebaseFirestore.instance
           .collection('user')
           .doc(uid)
@@ -71,6 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final name = data?['name'] ?? 'User';
       final isFrozen = data?['isFrozen'] ?? false;
 
+      // 3. Security Check
       if (isFrozen == true) {
         await _auth.signOut();
         throw FirebaseAuthException(
@@ -79,25 +82,33 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
 
+      // 4. SAVE DATA LOCALLY (Crucial for Background Service)
       final prefs = await SharedPreferences.getInstance();
+      
+      // This allows the Background Service to find the UID even if app is closed
+      await prefs.setString('uid', uid); 
+      await prefs.setString('role', role);
+      await prefs.setString('username', name);
+
+      // Handle "Remember Me" (Email only)
       if (_rememberMe) {
         await prefs.setString('email', _emailController.text.trim());
       } else {
         await prefs.remove('email');
       }
       
-      await prefs.setString('uid', uid);
-      await prefs.setString('role', role);
-      await prefs.setString('username', name);
-
       if (!mounted) return;
 
+      // 5. Navigate based on Role
       if (role == 'admin') {
+        // Admin goes to Admin Dashboard
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const AdminDashboard()),
         );
       } else if (role == 'employee') {
+        // Employee goes to Employee Dashboard
+        // NOTE: The Background Service Start trigger is inside EmployeeDashboard initState()
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const EmployeeDashboard()),

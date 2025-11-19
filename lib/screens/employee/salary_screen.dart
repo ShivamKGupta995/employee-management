@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart';
 
 class SalaryScreen extends StatelessWidget {
   const SalaryScreen({Key? key}) : super(key: key);
@@ -11,120 +10,121 @@ class SalaryScreen extends StatelessWidget {
     final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text("Latest Salary Slip"),
-        backgroundColor: Colors.blue[900],
-        foregroundColor: Colors.white,
+        title: const Text("Latest Monthly Report"),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        elevation: 0,
       ),
       body: StreamBuilder<QuerySnapshot>(
-        // 1. THE MAGIC QUERY:
-        // Get slips for this user -> Sort by Newest -> Take only ONE.
+        // QUERY: Get only the NEWEST slip for this user
         stream: FirebaseFirestore.instance
             .collection('salary_slips')
             .where('uid', isEqualTo: user?.uid)
-            .orderBy('timestamp', descending: true) 
-            .limit(1) 
+            .orderBy('timestamp', descending: true) // Sort by date
+            .limit(1) // Only get the top 1
             .snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(child: Text("Error: ${snapshot.error}"));
-          }
+          // 1. Loading State
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (snapshot.data!.docs.isEmpty) {
+          // 2. Error State
+          if (snapshot.hasError) {
+            // Note: If you see an index error here, check the Debug Console for the link!
+            return Center(child: Text("Error: ${snapshot.error}"));
+          }
+
+          // 3. Empty State
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
             return _buildNoDataView();
           }
 
-          // Get the Single Latest Document
+          // 4. Success State
           final data = snapshot.data!.docs.first.data() as Map<String, dynamic>;
-          
-          return _buildSalarySlip(data);
+          return _buildReportCard(data);
         },
       ),
     );
   }
 
-  Widget _buildSalarySlip(Map<String, dynamic> data) {
-    final currency = NumberFormat.currency(symbol: "₹", decimalDigits: 0, locale: "en_IN");
+  Widget _buildReportCard(Map<String, dynamic> data) {
+    String month = data['month'] ?? "--";
+    String year = data['year'] ?? "--";
     
-    // Calculate Totals (if not stored in DB)
-    double basic = (data['basic'] ?? 0).toDouble();
-    double hra = (data['hra'] ?? 0).toDouble();
-    double allowance = (data['allowance'] ?? 0).toDouble();
-    double deductions = (data['deductions'] ?? 0).toDouble();
-    double netSalary = (basic + hra + allowance) - deductions;
+    // Get values (Default to 0 if missing)
+    int present = (data['present'] ?? 0).toInt();
+    int absent = (data['absent'] ?? 0).toInt();
+    int late = (data['late'] ?? 0).toInt();
+
+    // Calculate Attendance Score (Just an example logic)
+    double totalDays = (present + absent).toDouble();
+    int score = totalDays > 0 ? ((present / totalDays) * 100).toInt() : 0;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          // Month Header
+          // HEADER CARD
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.blue[900],
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              gradient: LinearGradient(
+                colors: [Colors.blue.shade900, Colors.blue.shade600],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(color: Colors.blue.withValues(alpha: 0.3), blurRadius: 15, offset: const Offset(0, 10))
+              ]
             ),
             child: Column(
               children: [
-                const Text("PAYSLIP FOR", style: TextStyle(color: Colors.white70, letterSpacing: 1.5)),
+                const Text("REPORT FOR", style: TextStyle(color: Colors.white70, letterSpacing: 1.2, fontSize: 12)),
                 const SizedBox(height: 5),
                 Text(
-                  "${data['month']} ${data['year']}",
-                  style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                  "$month $year",
+                  style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 20),
-                const Text("NET PAYABLE", style: TextStyle(color: Colors.white70)),
-                Text(
-                  currency.format(netSalary),
-                  style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ),
-
-          // Details Card
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
-              boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 10)],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("Earnings", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                const Divider(),
-                _row("Basic Salary", currency.format(basic)),
-                _row("HRA", currency.format(hra)),
-                _row("Special Allowance", currency.format(allowance)),
-                
-                const SizedBox(height: 20),
-                
-                const Text("Deductions", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                const Divider(),
-                _row("PF / Tax / Other", "- ${currency.format(deductions)}"),
-
-                const Divider(thickness: 2, height: 30),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text("Total Net Pay", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    Text(currency.format(netSalary), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.blue)),
+                    _headerStat("Score", "$score%", Icons.verified),
+                    Container(height: 30, width: 1, color: Colors.white24, margin: const EdgeInsets.symmetric(horizontal: 20)),
+                    _headerStat("Status", score > 80 ? "Good" : "Average", Icons.thumb_up),
                   ],
-                ),
+                )
               ],
             ),
           ),
-          
-          const SizedBox(height: 20),
+
+          const SizedBox(height: 25),
+
+          // STATS GRID
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            crossAxisSpacing: 15,
+            mainAxisSpacing: 15,
+            childAspectRatio: 1.1,
+            children: [
+              _buildStatCard("Present", "$present Days", Colors.green, Icons.check_circle_outline),
+              _buildStatCard("Absent", "$absent Days", Colors.red, Icons.cancel_outlined),
+              _buildStatCard("Late", "$late Days", Colors.orange, Icons.watch_later_outlined),
+              // You can add Overtime here if you added it to the upload
+              _buildStatCard("Working Days", "${present+absent}", Colors.blue, Icons.calendar_today),
+            ],
+          ),
+
+          const SizedBox(height: 30),
           const Text(
-            "Note: You can only view your most recent salary slip.\nContact HR for older records.",
+            "This report is generated by Admin.\nContact HR for discrepancies.",
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.grey, fontSize: 12),
           ),
@@ -133,14 +133,37 @@ class SalaryScreen extends StatelessWidget {
     );
   }
 
-  Widget _row(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _headerStat(String label, String value, IconData icon) {
+    return Column(
+      children: [
+        Icon(icon, color: Colors.white, size: 20),
+        const SizedBox(height: 4),
+        Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10)),
+      ],
+    );
+  }
+
+  Widget _buildStatCard(String title, String value, Color color, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.05), blurRadius: 10)],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(label, style: const TextStyle(color: Colors.black54)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(height: 12),
+          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          Text(title, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
         ],
       ),
     );
@@ -151,9 +174,11 @@ class SalaryScreen extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.receipt_long_outlined, size: 80, color: Colors.grey[300]),
-          const SizedBox(height: 10),
-          const Text("No Salary Slip Generated", style: TextStyle(color: Colors.grey, fontSize: 16)),
+          Icon(Icons.receipt_long, size: 80, color: Colors.grey[300]),
+          const SizedBox(height: 15),
+          const Text("No Reports Available", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 5),
+          const Text("Your monthly report hasn't been uploaded yet.", style: TextStyle(color: Colors.grey)),
         ],
       ),
     );
