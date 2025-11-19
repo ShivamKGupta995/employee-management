@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart'; // Required for the Secondary App fix
 
 class ManageEmployeesScreen extends StatefulWidget {
   const ManageEmployeesScreen({Key? key}) : super(key: key);
@@ -11,9 +11,7 @@ class ManageEmployeesScreen extends StatefulWidget {
 }
 
 class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
-  final CollectionReference usersRef = FirebaseFirestore.instance.collection(
-    'user',
-  );
+  final CollectionReference usersRef = FirebaseFirestore.instance.collection('user');
 
   final List<String> roleList = ['admin', 'employee'];
   final List<String> departmentList = [
@@ -22,55 +20,38 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
     'Engineering',
     'Sales',
     'Marketing',
+    'General',
   ];
+
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController departmentController = TextEditingController();
   final TextEditingController roleController = TextEditingController();
-  String adminEmail = ""; // Store admin email for re-login
-  String adminPassword = ""; // Store admin password for re-login
-  @override
-  void initState() {
-    super.initState();
-    _loadSavedCredentials();
-  }
 
-  Future<void> _loadSavedCredentials() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedEmail = prefs.getString('email');
-    final savedPassword = prefs.getString('password');
-
-    if (savedEmail != null && savedPassword != null) {
-      setState(() {
-        adminEmail = savedEmail;
-        adminPassword = savedPassword;
-      });
-
-      // Optional auto-login
-      // await _login();
-    }
-  }
-
+  // Opens the dialog to Add or Edit
   void _openEmployeeDialog({DocumentSnapshot? employee}) {
     if (employee != null) {
-      // Edit mode
-      nameController.text = employee['name'];
-      emailController.text = employee['email'];
-      phoneController.text = employee['phone'];
-      departmentController.text = employee['department'];
-      roleController.text = employee['role'];
+      // Edit mode: Pre-fill data
+      final data = employee.data() as Map<String, dynamic>;
+      nameController.text = data['name'] ?? '';
+      emailController.text = data['email'] ?? '';
+      phoneController.text = data['phone'] ?? '';
+      departmentController.text = data['department'] ?? departmentList.first;
+      roleController.text = data['role'] ?? roleList.last;
     } else {
-      // Add mode
+      // Add mode: Clear fields
       nameController.clear();
       emailController.clear();
       phoneController.clear();
-      departmentController.clear();
-      roleController.clear();
+      // Set defaults
+      departmentController.text = departmentList.first; 
+      roleController.text = roleList.last; 
     }
 
     showDialog(
       context: context,
+      barrierDismissible: false, // Prevent closing while loading
       builder: (_) => AlertDialog(
         title: Text(employee == null ? 'Add Employee' : 'Edit Employee'),
         content: SingleChildScrollView(
@@ -80,15 +61,22 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                 controller: nameController,
                 decoration: const InputDecoration(labelText: 'Name'),
               ),
+              // Only allow editing email if it's a new user
               TextField(
                 controller: emailController,
                 decoration: const InputDecoration(labelText: 'Email'),
+                enabled: employee == null, 
               ),
               TextField(
                 controller: phoneController,
                 decoration: const InputDecoration(labelText: 'Phone'),
+                keyboardType: TextInputType.phone,
               ),
+              const SizedBox(height: 10),
               DropdownButtonFormField<String>(
+                value: departmentList.contains(departmentController.text) 
+                    ? departmentController.text 
+                    : departmentList.first,
                 items: departmentList.map((department) {
                   return DropdownMenuItem(
                     value: department,
@@ -100,16 +88,18 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                 },
                 decoration: const InputDecoration(labelText: 'Department'),
               ),
+              const SizedBox(height: 10),
               DropdownButtonFormField<String>(
+                value: roleList.contains(roleController.text) 
+                    ? roleController.text 
+                    : roleList.last,
                 items: roleList.map((role) {
                   return DropdownMenuItem(value: role, child: Text(role));
                 }).toList(),
                 onChanged: (value) {
                   roleController.text = value ?? '';
                 },
-                decoration: const InputDecoration(
-                  labelText: 'Role (admin/employee)',
-                ),
+                decoration: const InputDecoration(labelText: 'Role'),
               ),
             ],
           ),
@@ -120,85 +110,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () async {
-              if (employee == null) {
-                try {
-                  // Create employee user
-                  UserCredential userCredential = await FirebaseAuth.instance
-                      .createUserWithEmailAndPassword(
-                        email: emailController.text.trim(),
-                        password: "123456",
-                      );
-
-                  String uid = userCredential.user!.uid;
-
-                  await FirebaseAuth.instance.signOut();
-
-                  // Re-login as admin
-                  UserCredential adminCredential = await FirebaseAuth.instance
-                      .signInWithEmailAndPassword(
-                        email: adminEmail,
-                        password: adminPassword,
-                      );
-
-                  // Force token refresh to re-enable Firestore access
-                  await adminCredential.user?.getIdToken(true);
-
-                  // Wait briefly to ensure authentication is restored
-                  await Future.delayed(const Duration(seconds: 5));
-
-                  // Now safely write to Firestore
-                  await usersRef.doc(uid).set({
-                    'name': nameController.text.trim(),
-                    'email': emailController.text.trim(),
-                    'phone': phoneController.text.trim(),
-                    'department': departmentController.text.trim(),
-                    'role': roleController.text.trim(),
-                    'createdAt': FieldValue.serverTimestamp(),
-                  });
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("✅ Employee added successfully"),
-                    ),
-                  );
-
-                  Navigator.pop(context);
-                  // Trigger a rebuild so the StreamBuilder reconnects and shows the new user.
-                  // This helps in situations where the auth state changed briefly while creating the user
-                  // and the real-time listener needs a quick refresh.
-                  await Future.delayed(const Duration(milliseconds: 300));
-                  if (mounted) setState(() {});
-                } on FirebaseAuthException catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Auth Error: ${e.message}")),
-                  );
-                } catch (e) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text("Error: $e")));
-                }
-              } else {
-                // Update existing employee
-                await usersRef.doc(employee.id).update({
-                  'name': nameController.text.trim(),
-                  'email': emailController.text.trim(),
-                  'phone': phoneController.text.trim(),
-                  'department': departmentController.text.trim(),
-                  'role': roleController.text.trim(),
-                });
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text("✅ Employee added successfully"),
-                  ),
-                );
-                await Future.delayed(const Duration(milliseconds: 300));
-                Navigator.pop(context);
-                if (mounted) setState(() {});
-              }
-            },
-
+            onPressed: () => _handleSave(employee),
             child: Text(employee == null ? 'Add' : 'Update'),
           ),
         ],
@@ -206,73 +118,166 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
     );
   }
 
+  // The Main Logic Function
+  Future<void> _handleSave(DocumentSnapshot? employee) async {
+    // 1. Show Loading Indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      if (employee == null) {
+        // ============================================
+        // LOGIC: ADD NEW EMPLOYEE (Secondary App Method)
+        // ============================================
+        
+        // A. Create a temporary Firebase App instance
+        // This allows us to create a user WITHOUT logging out the Admin
+        FirebaseApp secondaryApp = await Firebase.initializeApp(
+          name: 'SecondaryApp',
+          options: Firebase.app().options,
+        );
+
+        // B. Create the user on the secondary app
+        UserCredential userCredential = await FirebaseAuth.instanceFor(app: secondaryApp)
+            .createUserWithEmailAndPassword(
+          email: emailController.text.trim(),
+          password: "123456", // Default Password
+        );
+
+        // C. Get the new UID
+        String uid = userCredential.user!.uid;
+
+        // D. Clean up the secondary app
+        await secondaryApp.delete();
+
+        // E. Save details to Firestore using the MAIN app (Admin's permission)
+        await usersRef.doc(uid).set({
+          'uid': uid,
+          'name': nameController.text.trim(),
+          'email': emailController.text.trim(),
+          'phone': phoneController.text.trim(),
+          'department': departmentController.text.trim(),
+          'role': roleController.text.trim(),
+          'createdAt': FieldValue.serverTimestamp(),
+          'isFrozen': false, 
+        });
+
+        if (!mounted) return;
+        Navigator.pop(context); // Close Loading
+        Navigator.pop(context); // Close Form
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("✅ Employee Added Successfully")),
+        );
+
+      } else {
+        // ============================================
+        // LOGIC: UPDATE EXISTING EMPLOYEE
+        // ============================================
+        await usersRef.doc(employee.id).update({
+          'name': nameController.text.trim(),
+          'phone': phoneController.text.trim(),
+          'department': departmentController.text.trim(),
+          'role': roleController.text.trim(),
+        });
+
+        if (!mounted) return;
+        Navigator.pop(context); // Close Loading
+        Navigator.pop(context); // Close Form
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("✅ Employee Updated")),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      Navigator.pop(context); // Close Loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Auth Error: ${e.message}")),
+      );
+    } catch (e) {
+      Navigator.pop(context); // Close Loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
+    }
+  }
+
   Future<void> _deleteEmployee(String docId) async {
+    // Optional: Add confirmation dialog here
     await usersRef.doc(docId).delete();
+    if(mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+         const SnackBar(content: Text("Employee Deleted")),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // NOTE: Keep AppBar commented out if this screen is inside AdminDashboard
+      // appBar: AppBar(title: const Text("Manage Employees")),
+      
+      // ✅ FIXED: Button is now visible
       floatingActionButton: FloatingActionButton(
         onPressed: () => _openEmployeeDialog(),
         backgroundColor: Colors.blueAccent,
-        child: const Icon(Icons.add),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
+      
       body: StreamBuilder<QuerySnapshot>(
         stream: usersRef.snapshots(),
         builder: (context, snapshot) {
+          // 1. Handle Error
           if (snapshot.hasError) {
-            final errorObj = snapshot.error;
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Error loading employees:\n${errorObj.toString()}'),
-                    const SizedBox(height: 12),
-                    ElevatedButton(
-                      onPressed: () {
-                        // Rebuild to re-subscribe to the stream (useful after transient auth changes)
-                        setState(() {});
-                      },
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              ),
-            );
+            return Center(child: Text('Error: ${snapshot.error}'));
           }
-          if (!snapshot.hasData) {
+          // 2. Handle Loading
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
           final employees = snapshot.data!.docs;
 
+          // 3. Handle Empty List
           if (employees.isEmpty) {
             return const Center(child: Text('No employees found'));
           }
 
+          // 4. Show List
           return ListView.builder(
             itemCount: employees.length,
+            padding: const EdgeInsets.only(bottom: 80), // Padding for FAB
             itemBuilder: (context, index) {
               final employee = employees[index];
+              final data = employee.data() as Map<String, dynamic>;
 
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 elevation: 2,
                 child: ListTile(
-                  title: Text(employee['name']),
-                  subtitle: Text(
-                    '${employee['department']} • ${employee['role']}',
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.blue[100],
+                    child: Text(
+                      (data['name'] ?? 'U').toString().substring(0, 1).toUpperCase(),
+                      style: const TextStyle(color: Colors.blue),
+                    ),
+                  ),
+                  title: Text(data['name'] ?? 'No Name'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${data['department']} • ${data['role']}'),
+                      Text(data['email'] ?? '', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    ],
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
                         icon: const Icon(Icons.edit, color: Colors.orange),
-                        onPressed: () =>
-                            _openEmployeeDialog(employee: employee),
+                        onPressed: () => _openEmployeeDialog(employee: employee),
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),
