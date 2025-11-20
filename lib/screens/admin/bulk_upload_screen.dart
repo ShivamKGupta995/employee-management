@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:excel/excel.dart';
+import 'package:excel/excel.dart' hide Border;
 import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:firebase_core/firebase_core.dart'; // Uncomment if Firebase initialization is needed
+// Usage later: excel_pkg.Border
 
 class BulkUploadScreen extends StatefulWidget {
   const BulkUploadScreen({Key? key}) : super(key: key);

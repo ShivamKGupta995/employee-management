@@ -2,10 +2,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:excel/excel.dart';
+// FIX 1: Hide Border to prevent conflict with Material Border
+import 'package:excel/excel.dart' hide Border;
 
 class GenerateSalaryScreen extends StatefulWidget {
-  const GenerateSalaryScreen({Key? key}) : super(key: key);
+  // FIX 2: Use super parameter
+  const GenerateSalaryScreen({super.key});
 
   @override
   State<GenerateSalaryScreen> createState() => _GenerateSalaryScreenState();
@@ -54,7 +56,6 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> with Single
         'uid': _selectedEmployeeId,
         'month': _selectedMonth,
         'year': _selectedYear,
-        // Only Attendance Data
         'present': int.tryParse(_presentController.text) ?? 0,
         'absent': int.tryParse(_absentController.text) ?? 0,
         'late': int.tryParse(_lateController.text) ?? 0,
@@ -66,7 +67,9 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> with Single
         _clearControllers();
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      }
     } finally {
       if (mounted) setState(() => _isSingleLoading = false);
     }
@@ -113,25 +116,19 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> with Single
         if (row.isEmpty || row[0] == null) continue;
 
         try {
-          // Column Mapping (Simplified):
-          // 0:Email | 1:Month | 2:Year | 3:Present | 4:Absent | 5:Late
-          
           String email = row[0]?.value.toString().trim() ?? "";
           String month = row[1]?.value.toString().trim() ?? "November";
           String year = row[2]?.value.toString().trim() ?? "2025";
           
-          // Attendance
           int present = int.tryParse(row[3]?.value.toString() ?? "0") ?? 0;
           int absent = int.tryParse(row[4]?.value.toString() ?? "0") ?? 0;
           int late = int.tryParse(row[5]?.value.toString() ?? "0") ?? 0;
 
-          // Find UID from Email
           final userSnap = await FirebaseFirestore.instance.collection('user').where('email', isEqualTo: email).limit(1).get();
           
           if (userSnap.docs.isNotEmpty) {
             String uid = userSnap.docs.first.id;
             
-            // Upload Slip
             await FirebaseFirestore.instance.collection('salary_slips').add({
               'uid': uid,
               'month': month,
@@ -150,12 +147,16 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> with Single
         }
       }
 
+      // FIX 3: Check mounted before using context/setState after async
+      if (!mounted) return;
+
       setState(() {
         _isBulkLoading = false;
         _bulkStatus = "✅ Processed! Success: $_successCount";
       });
 
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isBulkLoading = false;
         _bulkStatus = "Error: $e";
@@ -195,7 +196,6 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> with Single
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Select Employee
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance.collection('user').where('role', isEqualTo: 'employee').snapshots(),
             builder: (context, snapshot) {
@@ -210,7 +210,6 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> with Single
           ),
           const SizedBox(height: 15),
           
-          // Date Selectors
           Row(children: [
             Expanded(child: DropdownButtonFormField(value: _selectedMonth, items: ["October", "November", "December"].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(), onChanged: (v) => setState(() => _selectedMonth = v.toString()))),
             const SizedBox(width: 10),
@@ -221,7 +220,6 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> with Single
           const Text("📅 Attendance Details", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 10),
 
-          // Attendance Inputs
           TextField(controller: _presentController, decoration: const InputDecoration(labelText: "Present Days", border: OutlineInputBorder(), prefixIcon: Icon(Icons.check_circle_outline)), keyboardType: TextInputType.number),
           const SizedBox(height: 10),
           TextField(controller: _absentController, decoration: const InputDecoration(labelText: "Absent Days", border: OutlineInputBorder(), prefixIcon: Icon(Icons.cancel_outlined)), keyboardType: TextInputType.number),
