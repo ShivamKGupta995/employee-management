@@ -9,6 +9,7 @@ on:
 jobs:
   analyze-and-test:
     runs-on: ubuntu-latest
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -16,7 +17,11 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 'stable'
+          # matches your specific version
+          flutter-version: '3.35.3'
+          channel: 'stable'
+          # Enables caching for the Flutter SDK itself
+          cache: true 
 
       - name: Cache Pub packages
         uses: actions/cache@v4
@@ -24,15 +29,21 @@ jobs:
           path: |
             ~/.pub-cache
             .dart_tool
-          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.yaml') }}
+          # Updated to use pubspec.lock for more accurate caching
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
           restore-keys: |
             ${{ runner.os }}-pub-
 
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Verify Flutter Version
+        run: flutter --version
+
       - name: Run analyzer
+        # --no-fatal-infos ensures the build doesn't crash on simple info messages
         run: flutter analyze --no-fatal-infos
 
       - name: Run tests
+        # Running with coverage as requested
         run: flutter test --coverage
