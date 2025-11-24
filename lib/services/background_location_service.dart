@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:ui';
-import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
@@ -10,11 +9,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class LocationService {
   
-  // 1. Initialize the Service (Call this from Login Screen or Dashboard)
+  // 1. Initialize the Service
   static Future<void> initialize() async {
     final service = FlutterBackgroundService();
 
-    // Create the Notification Channel (Required for Android Foreground Service)
+    // Create Notification Channel
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
       'my_foreground', 
       'Location Tracking',
@@ -32,19 +31,13 @@ class LocationService {
 
     await service.configure(
       androidConfiguration: AndroidConfiguration(
-        // This function runs when service starts
         onStart: onStart,
-
-        // Auto start is false so we can control it manually after login
         autoStart: false, 
         isForegroundMode: true,
-        
         notificationChannelId: 'my_foreground',
         initialNotificationTitle: 'Employee App',
         initialNotificationContent: 'Initializing Location Service...',
         foregroundServiceNotificationId: 888,
-        
-        // CRITICAL for Android 14+
         foregroundServiceTypes: [AndroidForegroundType.location], 
       ),
       iosConfiguration: IosConfiguration(
@@ -55,15 +48,12 @@ class LocationService {
     );
   }
 
-  // 2. The Background Logic (Runs in a separate thread/isolate)
+  // 2. The Background Logic
   @pragma('vm:entry-point')
   static void onStart(ServiceInstance service) async {
-    // Necessary initialization for background isolates
     DartPluginRegistrant.ensureInitialized();
     
-    // Initialize Firebase inside this background thread
-    // NOTE: You might need to pass options if you have specific config, 
-    // but usually default works if configured via flutterfire CLI.
+    // Initialize Firebase
     await Firebase.initializeApp();
 
     if (service is AndroidServiceInstance) {
@@ -80,9 +70,9 @@ class LocationService {
       service.stopSelf();
     });
 
-    // Get the Employee ID (We assume it was saved to SharedPreferences during Login)
+    // Get the Employee ID
     final prefs = await SharedPreferences.getInstance();
-    final String? empId = prefs.getString('uid'); // Make sure you saved 'uid' in LoginScreen
+    final String? empId = prefs.getString('uid'); 
 
     print("Background Service Started. Tracking Employee: $empId");
 
@@ -92,24 +82,55 @@ class LocationService {
         if (await service.isForegroundService()) {
           
           try {
-            // A. Get Location
+            // A. Get Location (UPDATED for Geolocator v10+)
+            // We use LocationSettings instead of just desiredAccuracy
             Position position = await Geolocator.getCurrentPosition(
-                desiredAccuracy: LocationAccuracy.high);
+              locationSettings: const LocationSettings(
+                accuracy: LocationAccuracy.high,
+                distanceFilter: 10, // Only update if moved 10 meters
+              ),
+            );
 
             print("📍 Location: ${position.latitude}, ${position.longitude}");
 
             // B. Upload to Firebase
             if (empId != null) {
-              await FirebaseFirestore.instance.collection('locations').add({
-                'empId': empId,
-                'lat': position.latitude,
-                'lng': position.longitude,
-                'timestamp': FieldValue.serverTimestamp(),
-                'speed': position.speed,
-                'isMocked': position.isMocked, // Good for detecting fake GPS
-              });
+              
+              // 1. Update "Current Location" (Overwrites old location for Real-time Map)
+              // Using empId as Document ID here makes it easy to find "Where is User X right now?"
+              await FirebaseFirestore.instance
+                  .collection('user')
+                  .doc(empId)
+                  .update({
+                    'current_lat': position.latitude,
+                    'current_lng': position.longitude,
+                    'last_seen': FieldValue.serverTimestamp(),
+                    'speed': position.speed,
+                    'isMocked': position.isMocked,
+                  })
+                  .catchError((e) {
+                    // If document doesn't exist (rare), create it
+                     FirebaseFirestore.instance.collection('user').doc(empId).set({
+                        'current_lat': position.latitude,
+                        'current_lng': position.longitude,
+                        'last_seen': FieldValue.serverTimestamp(),
+                     }, SetOptions(merge: true));
+                  });
 
-              // C. Update Notification (Visual feedback)
+              // 2. Save to History (Creates a TRAIL using Auto-ID)
+              // This allows you to replay their path later
+              await FirebaseFirestore.instance
+                  .collection('user')
+                  .doc(empId)
+                  .collection('location_history') // Sub-collection
+                  .add({
+                    'lat': position.latitude,
+                    'lng': position.longitude,
+                    'timestamp': FieldValue.serverTimestamp(),
+                    'speed': position.speed,
+                  });
+
+              // C. Update Notification
               service.setForegroundNotificationInfo(
                 title: "Work Tracking Active",
                 content: "Last Update: ${DateTime.now().hour}:${DateTime.now().minute}",
@@ -132,7 +153,6 @@ class LocationService {
     return true;
   }
   
-  // Helper to start service manually
   static Future<void> startTracking() async {
     final service = FlutterBackgroundService();
     var isRunning = await service.isRunning();
@@ -141,7 +161,6 @@ class LocationService {
     }
   }
   
-  // Helper to stop service
   static Future<void> stopTracking() async {
     final service = FlutterBackgroundService();
     service.invoke("stopService");

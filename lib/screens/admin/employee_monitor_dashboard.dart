@@ -58,7 +58,7 @@ class _EmployeeMonitorDashboardState extends State<EmployeeMonitorDashboard> wit
 }
 
 // ===================================================
-// 1. LIVE MAP TAB (FIXED)
+// 1. LIVE MAP TAB (FIXED for 'user' collection)
 // ===================================================
 class _LiveMapTab extends StatelessWidget {
   final String employeeId;
@@ -75,13 +75,11 @@ class _LiveMapTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<QuerySnapshot>( // Changed type to QuerySnapshot
-      // FIX: Removed .map() logic. We handle the list inside the builder now.
+    return StreamBuilder<DocumentSnapshot>( // Changed to DocumentSnapshot
+      // FIX 1: Listen to the 'user' collection, specific employee doc
       stream: FirebaseFirestore.instance
-          .collection('locations')
-          .where('empId', isEqualTo: employeeId)
-          .orderBy('timestamp', descending: true)
-          .limit(1)
+          .collection('user') 
+          .doc(employeeId)
           .snapshots(),
       builder: (context, snapshot) {
         // 1. Handle Loading
@@ -89,27 +87,39 @@ class _LiveMapTab extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
 
-        // 2. Handle No Data / Empty List
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        // 2. Handle Errors or Missing User
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return const Center(child: Text("Employee data not found"));
+        }
+
+        // 3. Get Data
+        var data = snapshot.data!.data() as Map<String, dynamic>;
+
+        // FIX 2: Check if 'current_lat' exists (Employee might have logged in but not started service yet)
+        if (!data.containsKey('current_lat') || !data.containsKey('current_lng')) {
           return const Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.location_off, size: 50, color: Colors.grey),
                 SizedBox(height: 10),
-                Text("No location data available."),
+                Text("Employee has not started tracking yet."),
               ],
             ),
           );
         }
-
-        // 3. Get Data (Safe access)
-        var doc = snapshot.data!.docs.first; // Get the first document
-        var data = doc.data() as Map<String, dynamic>;
         
-        double lat = data['lat'];
-        double lng = data['lng'];
+        // FIX 3: Use the fields written by your LocationService
+        // ✅ SAFE WAY (Converts both Int and Double to Double)
+        double lat = (data['current_lat'] as num).toDouble();
+        double lng = (data['current_lng'] as num).toDouble();
         LatLng pos = LatLng(lat, lng);
+        
+        // Optional: Get Last Seen time
+        Timestamp? ts = data['last_seen'];
+        String timeStr = ts != null 
+            ? "${ts.toDate().hour}:${ts.toDate().minute}" 
+            : "Unknown";
 
         return Stack(
           children: [
@@ -119,7 +129,10 @@ class _LiveMapTab extends StatelessWidget {
                 Marker(
                   markerId: const MarkerId('emp'),
                   position: pos,
-                  infoWindow: const InfoWindow(title: "Current Location"),
+                  infoWindow: InfoWindow(
+                    title: "Current Location",
+                    snippet: "Last Update: $timeStr",
+                  ),
                 )
               },
             ),
@@ -132,7 +145,7 @@ class _LiveMapTab extends StatelessWidget {
                 icon: const Icon(Icons.navigation),
                 label: const Text("NAVIGATE TO EMPLOYEE"),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
+                  backgroundColor: Colors.blue[900],
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.all(15),
                 ),

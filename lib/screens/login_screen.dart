@@ -104,14 +104,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
       // 6. Navigate based on Role
       if (role == 'admin') {
-        Navigator.pushReplacement(
+         // This removes all previous routes (Login) from the stack
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const AdminDashboard()),
+          (route) => false, // This condition removes everything
         );
       } else if (role == 'employee') {
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const EmployeeDashboard()),
+          (route) => false,
         );
       } else {
         await _auth.signOut();
