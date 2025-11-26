@@ -58,44 +58,52 @@ class _EmployeeMonitorDashboardState extends State<EmployeeMonitorDashboard> wit
 }
 
 // ===================================================
-// 1. LIVE MAP TAB (FIXED for 'user' collection)
+// 1. LIVE MAP TAB (OPTIMIZED FOR ADMIN UX)
 // ===================================================
-class _LiveMapTab extends StatelessWidget {
+class _LiveMapTab extends StatefulWidget {
   final String employeeId;
   const _LiveMapTab({Key? key, required this.employeeId}) : super(key: key);
+
+  @override
+  State<_LiveMapTab> createState() => _LiveMapTabState();
+}
+
+class _LiveMapTabState extends State<_LiveMapTab> {
+  GoogleMapController? _mapController;
+  bool _isFirstLoad = true;
 
   Future<void> _openGoogleMaps(double lat, double lng) async {
     final uri = Uri.parse("google.navigation:q=$lat,$lng&mode=d");
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     } else {
-      throw 'Could not launch Google Maps';
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not launch Google Maps')),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<DocumentSnapshot>( // Changed to DocumentSnapshot
-      // FIX 1: Listen to the 'user' collection, specific employee doc
+    return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
-          .collection('user') 
-          .doc(employeeId)
+          .collection('user')
+          .doc(widget.employeeId)
           .snapshots(),
       builder: (context, snapshot) {
-        // 1. Handle Loading
+        // 1. Loading
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        // 2. Handle Errors or Missing User
+        // 2. No Data
         if (!snapshot.hasData || !snapshot.data!.exists) {
           return const Center(child: Text("Employee data not found"));
         }
 
-        // 3. Get Data
         var data = snapshot.data!.data() as Map<String, dynamic>;
 
-        // FIX 2: Check if 'current_lat' exists (Employee might have logged in but not started service yet)
+        // 3. Check for Location Data
         if (!data.containsKey('current_lat') || !data.containsKey('current_lng')) {
           return const Center(
             child: Column(
@@ -108,47 +116,121 @@ class _LiveMapTab extends StatelessWidget {
             ),
           );
         }
-        
-        // FIX 3: Use the fields written by your LocationService
-        // ✅ SAFE WAY (Converts both Int and Double to Double)
+
+        // 4. Parse Data
         double lat = (data['current_lat'] as num).toDouble();
         double lng = (data['current_lng'] as num).toDouble();
         LatLng pos = LatLng(lat, lng);
-        
-        // Optional: Get Last Seen time
+        double speed = (data['speed'] as num?)?.toDouble() ?? 0.0;
+
+        // 5. Calculate "Online" Status
         Timestamp? ts = data['last_seen'];
-        String timeStr = ts != null 
-            ? "${ts.toDate().hour}:${ts.toDate().minute}" 
-            : "Unknown";
+        bool isOnline = false;
+        String statusText = "Offline";
+        Color statusColor = Colors.grey;
+
+        if (ts != null) {
+          final lastSeen = ts.toDate();
+          final diff = DateTime.now().difference(lastSeen).inMinutes;
+          
+          if (diff < 5) {
+            isOnline = true;
+            statusText = "🟢 Live Now (${(speed * 3.6).toStringAsFixed(1)} km/h)"; // Speed in km/h
+            statusColor = Colors.green;
+          } else {
+            statusText = "🔴 Last seen $diff min ago";
+            statusColor = Colors.red;
+          }
+        }
+
+        // 6. Camera Handling (Only move on first load to avoid jitter)
+        if (_isFirstLoad && _mapController != null) {
+          _mapController!.animateCamera(CameraUpdate.newLatLng(pos));
+          _isFirstLoad = false;
+        }
 
         return Stack(
           children: [
             GoogleMap(
               initialCameraPosition: CameraPosition(target: pos, zoom: 15),
+              onMapCreated: (controller) {
+                _mapController = controller;
+              },
               markers: {
                 Marker(
                   markerId: const MarkerId('emp'),
                   position: pos,
+                  // Use a colored icon based on status if you have assets, 
+                  // otherwise default red pin is standard.
+                  icon: BitmapDescriptor.defaultMarkerWithHue(
+                    isOnline ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed
+                  ),
                   infoWindow: InfoWindow(
-                    title: "Current Location",
-                    snippet: "Last Update: $timeStr",
+                    title: "Employee Location",
+                    snippet: statusText,
                   ),
                 )
               },
             ),
+
+            // --- UI ELEMENT 1: STATUS PILL ---
             Positioned(
-              bottom: 20,
+              top: 20,
               left: 20,
               right: 20,
-              child: ElevatedButton.icon(
-                onPressed: () => _openGoogleMaps(lat, lng),
-                icon: const Icon(Icons.navigation),
-                label: const Text("NAVIGATE TO EMPLOYEE"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue[900],
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.all(15),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10)],
                 ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.circle, color: statusColor, size: 14),
+                    const SizedBox(width: 10),
+                    Text(
+                      statusText,
+                      style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // --- UI ELEMENT 2: CONTROLS ---
+            Positioned(
+              bottom: 30,
+              left: 20,
+              right: 20,
+              child: Row(
+                children: [
+                  // Re-Center Button
+                  FloatingActionButton(
+                    heroTag: "center",
+                    backgroundColor: Colors.white,
+                    child: const Icon(Icons.my_location, color: Colors.blue),
+                    onPressed: () {
+                      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(pos, 16));
+                    },
+                  ),
+                  const SizedBox(width: 15),
+                  // Navigate Button
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _openGoogleMaps(lat, lng),
+                      icon: const Icon(Icons.directions),
+                      label: const Text("NAVIGATE"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue[900],
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.all(15),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

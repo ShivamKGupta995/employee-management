@@ -1,7 +1,9 @@
+import 'package:employee_system/utils/battery_optimization_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 
 // IMPORTS (Make sure you have these files created from previous steps)
@@ -12,6 +14,7 @@ import 'package:employee_system/screens/employee/upload_screen.dart';
 import 'package:employee_system/services/contact_service.dart';
 import 'package:employee_system/services/background_location_service.dart'; // If you have this file
 
+import 'package:employee_system/services/background_location_service.dart'; // If you have this file
 class EmployeeDashboard extends StatefulWidget {
   const EmployeeDashboard({Key? key}) : super(key: key);
 
@@ -31,12 +34,14 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
     // 1. Subscribe to Notifications
     FirebaseMessaging.instance.subscribeToTopic('all_employees');
 
-    // 2. Start Background Location (If you implemented the service)
-    // LocationService.initialize(); 
-     // Initialize and Start Tracking
-    LocationService.initialize().then((_) {
-      LocationService.startTracking();
-    });
+    // 2. Setup & Start Location Service
+    // ✅ CHECK BATTERY OPTIMIZATION FIRST
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    BatteryOptimizationHelper.checkAndRequestBatteryOptimization(context);
+  });
+
+  // Setup Tracking
+  _setupTracking();
 
     _fetchUserDetails();
   }
@@ -54,7 +59,113 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
     }
   }
 
-  void _onItemTapped(int index) {
+
+Future<void> _setupTracking() async {
+  print("🔧 Setting up tracking...");
+  
+  // 1. Initialize Service
+  await LocationService.initialize();
+  print("✅ Service initialized");
+
+  // 2. Check GPS is ON
+  bool gpsEnabled = await Geolocator.isLocationServiceEnabled();
+  if (!gpsEnabled) {
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text("GPS Required"),
+          content: const Text("Please enable GPS/Location Services to use tracking."),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await Geolocator.openLocationSettings();
+                Navigator.pop(context);
+              },
+              child: const Text("Open Settings"),
+            ),
+          ],
+        ),
+      );
+    }
+    return;
+  }
+
+  // 3. Request Permissions
+  bool hasPermissions = await LocationService.requestPermissions();
+  print("📋 Permissions granted: $hasPermissions");
+
+  if (!hasPermissions) {
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text("Permissions Required"),
+          content: const Text(
+            "This app needs:\n"
+            "• Location: ALLOW ALL THE TIME\n"
+            "• Notifications: Allow\n\n"
+            "Please grant these permissions in Settings.",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await Geolocator.openAppSettings();
+                Navigator.pop(context);
+              },
+              child: const Text("Open Settings"),
+            ),
+          ],
+        ),
+      );
+    }
+    return;
+  }
+
+  // 4. Test GPS Before Starting Service
+  try {
+    print("🧪 Testing GPS signal...");
+    Position testPosition = await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 15),
+      ),
+    ).timeout(const Duration(seconds: 15));
+    
+    print("✅ GPS Test Successful: ${testPosition.latitude}, ${testPosition.longitude}");
+  } catch (e) {
+    print("❌ GPS Test Failed: $e");
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("GPS signal is weak. Please move to an open area.\nError: $e"),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
+    // Don't return - still start the service, it will keep trying
+  }
+
+  // 5. Start Service
+  final user = FirebaseAuth.instance.currentUser;
+  if (user != null) {
+    await LocationService.startLocationService(user.uid);
+    print("✅ Location service started");
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("✅ Location tracking started successfully!"),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+}  void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
