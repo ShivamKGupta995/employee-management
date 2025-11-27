@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 
 // Import your screens
+import 'manage_emergency_screen.dart' show ManageEmergencyScreen;
 import 'manage_employees.dart';
 import 'notifications_screen.dart';
 import 'attendance.dart';
@@ -37,6 +38,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     {'title': 'Monitoring', 'icon': Icons.monitor_rounded},
     {'title': 'Reports', 'icon': Icons.bar_chart_rounded},
     {'title': 'Manage Holidays', 'icon': Icons.calendar_month_outlined},
+    {'title': 'Emergency Contacts', 'icon': Icons.phone_in_talk_rounded},
     {'title': 'Settings', 'icon': Icons.settings_rounded},
   ];
 
@@ -98,6 +100,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       const EmployeeListMonitor(),
       const ReportsScreen(),
       const ManageHolidaysScreen(),
+      const ManageEmergencyScreen(),
       const SettingsScreen(),
     ];
 

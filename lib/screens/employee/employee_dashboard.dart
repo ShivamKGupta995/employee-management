@@ -1,3 +1,4 @@
+import 'package:employee_system/screens/employee/emergency_screen.dart';
 import 'package:employee_system/screens/employee/holiday_screen.dart';
 import 'package:employee_system/utils/battery_optimization_helper.dart';
 import 'package:flutter/material.dart';
@@ -372,6 +373,7 @@ class _HomeTabState extends State<HomeTab> {
                          Navigator.push(context, MaterialPageRoute(builder: (_) => const HolidayScreen()));
                       }),
                       _buildActionCard(context, Icons.contact_phone, "Emergency", Colors.red, () {
+                         Navigator.push(context, MaterialPageRoute(builder: (_) => const EmergencyScreen()));
                         // Add Emergency Screen navigation if you have it
                       }),
                     ],
