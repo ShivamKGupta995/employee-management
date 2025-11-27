@@ -12,6 +12,10 @@ class DateFormatter {
   static final DateFormat _dateFull = DateFormat('EEEE, d MMMM yyyy');
   static final DateFormat _dateFile = DateFormat('yyyy-MM-dd');
   
+  // ✅ ADDED FOR HOLIDAY FEATURE
+  static final DateFormat _dayNumber = DateFormat('d');   // Returns "25", "1"
+  static final DateFormat _monthAbbr = DateFormat('MMM'); // Returns "Jan", "Dec"
+
   // ==========================================
   // TIME FORMATS
   // ==========================================
@@ -40,6 +44,14 @@ class DateFormatter {
   
   /// Format: "2025-11-26" (for file names, IDs)
   static String formatForFile(DateTime date) => _dateFile.format(date);
+
+  // ✅ ADDED FOR HOLIDAY UI (The Big Number)
+  /// Format: "25" or "1"
+  static String formatDayNumber(DateTime date) => _dayNumber.format(date);
+
+  // ✅ ADDED FOR HOLIDAY UI (The Month Label)
+  /// Format: "Nov" or "Dec"
+  static String formatMonthAbbr(DateTime date) => _monthAbbr.format(date);
   
   /// Format: "03:45 PM"
   static String formatTime(DateTime date) => _time12h.format(date);

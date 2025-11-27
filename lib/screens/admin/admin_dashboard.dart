@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+
 // Import your screens
 import 'manage_employees.dart';
 import 'notifications_screen.dart';
@@ -11,6 +12,7 @@ import 'attendance.dart';
 import 'reports.dart';
 import 'settings.dart';
 import 'generate_salary_screen.dart';
+import 'manage_holidays_screen.dart';
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({Key? key}) : super(key: key);
 
@@ -34,6 +36,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     {'title': 'Generate Salary', 'icon': Icons.attach_money_rounded},
     {'title': 'Monitoring', 'icon': Icons.monitor_rounded},
     {'title': 'Reports', 'icon': Icons.bar_chart_rounded},
+    {'title': 'Manage Holidays', 'icon': Icons.calendar_month_outlined},
     {'title': 'Settings', 'icon': Icons.settings_rounded},
   ];
 
@@ -94,6 +97,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       const GenerateSalaryScreen(),
       const EmployeeListMonitor(),
       const ReportsScreen(),
+      const ManageHolidaysScreen(),
       const SettingsScreen(),
     ];
 

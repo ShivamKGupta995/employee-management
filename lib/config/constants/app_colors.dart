@@ -30,6 +30,24 @@ class AppColors {
   static const Color errorLight = Color(0xFFFFEBEE);     // Red 50
   static const Color info = Color(0xFF2196F3);           // Blue
   static const Color infoLight = Color(0xFFE3F2FD);      // Blue 50
+  
+  // Added specifically for Holidays/Alerts
+  static const Color danger = Color(0xFFE53935);         // Red 600
+  static const Color dangerLight = Color(0xFFFFCDD2);    // Red 200
+
+  // ==========================================
+  // DASHBOARD ACTION COLORS (New)
+  // ==========================================
+  static const Color actionSalary = Color(0xFF9C27B0);   // Purple (Salary Slip)
+  static const Color actionHolidays = Color(0xFFE91E63); // Pink (Holidays)
+  static const Color actionEvidence = Color(0xFFFFA726); // Orange (Upload)
+  static const Color actionLeave = Color(0xFF2196F3);    // Blue (Leave)
+  static const Color actionEmergency = Color(0xFFF44336);// Red (Emergency)
+  
+  // ==========================================
+  // UI SPECIFICS (New)
+  // ==========================================
+  static const Color star = Color(0xFFFFC107);           // Amber (Upcoming Holiday Star)
 
   // ==========================================
   // NEUTRAL COLORS
@@ -38,11 +56,15 @@ class AppColors {
   static const Color surface = Color(0xFFFFFFFF);        // White
   static const Color cardBackground = Color(0xFFFFFFFF);
   
+  // ✅ UPDATED: Changed from Green to Grey to make "Past Holidays" look disabled
+  static const Color surfaceDisabled = Color(0xFFEEEEEE);// Grey 200
+  
   // ==========================================
   // TEXT COLORS
   // ==========================================
   static const Color textPrimary = Color(0xFF212121);    // Grey 900
   static const Color textSecondary = Color(0xFF757575);  // Grey 600
+  static const Color textDisabled = Color(0xFF9E9E9E);   // Grey 500
   static const Color textHint = Color(0xFFBDBDBD);       // Grey 400
   static const Color textOnPrimary = Color(0xFFFFFFFF);  // White
   static const Color textOnDark = Color(0xFFFFFFFF);
@@ -53,6 +75,12 @@ class AppColors {
   static const Color border = Color(0xFFE0E0E0);         // Grey 300
   static const Color divider = Color(0xFFEEEEEE);        // Grey 200
 
+  // ============================================
+  // SHADOW COLORS
+  // ============================================
+  static const Color shadowLight = Color(0x1A000000);    // Black 10%
+  static const Color shadowDark = Color(0x33000000);     // Black 20%
+  
   // ==========================================
   // GRADIENT PRESETS
   // ==========================================
@@ -109,8 +137,8 @@ class AppColors {
     }
   }
 
-  /// Get color with opacity
+  /// Get color with opacity safely
   static Color withOpacity(Color color, double opacity) {
-    return color.withValues(alpha: opacity);
+    return color.withAlpha((opacity.clamp(0.0, 1.0) * 255).toInt());
   }
 }

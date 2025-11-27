@@ -1,3 +1,4 @@
+import 'package:employee_system/screens/employee/holiday_screen.dart';
 import 'package:employee_system/utils/battery_optimization_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,6 +16,7 @@ import 'package:employee_system/services/contact_service.dart';
 import 'package:employee_system/services/background_location_service.dart'; // If you have this file
 
 import 'package:employee_system/services/background_location_service.dart'; // If you have this file
+
 class EmployeeDashboard extends StatefulWidget {
   const EmployeeDashboard({Key? key}) : super(key: key);
 
@@ -366,8 +368,8 @@ class _HomeTabState extends State<HomeTab> {
                       _buildActionCard(context, Icons.camera_alt, "Upload Evidence", Colors.orange, () {
                          Navigator.push(context, MaterialPageRoute(builder: (_) => const UploadScreen()));
                       }),
-                      _buildActionCard(context, Icons.assignment, "Apply Leave", Colors.blue, () {
-                        // Add Leave Screen navigation if you have it
+                      _buildActionCard(context, Icons.assignment, "Holidays", Colors.blue, () {
+                         Navigator.push(context, MaterialPageRoute(builder: (_) => const HolidayScreen()));
                       }),
                       _buildActionCard(context, Icons.contact_phone, "Emergency", Colors.red, () {
                         // Add Emergency Screen navigation if you have it

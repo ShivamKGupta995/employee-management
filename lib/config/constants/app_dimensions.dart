@@ -41,6 +41,7 @@ class AppDimensions {
   // ==========================================
   // ICON SIZES
   // ==========================================
+  static const double iconXXS = 14.0; // ✅ ADDED: For small holiday calendar icons
   static const double iconXS = 16.0;
   static const double iconSM = 20.0;
   static const double iconMD = 24.0;
@@ -128,6 +129,11 @@ class AppDimensions {
   // CLOCK IN BUTTON
   // ==========================================
   static const double clockButtonSize = 150.0;
+  
+  // ==========================================
+  // HOLIDAY UI (New)
+  // ==========================================
+  static const double dateBoxSize = 80.0; // ✅ ADDED: For the Date Box in Holiday List
 
   // ==========================================
   // EDGE INSETS PRESETS
