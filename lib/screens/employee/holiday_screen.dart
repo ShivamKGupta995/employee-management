@@ -114,7 +114,7 @@ class _HolidayScreenState extends State<HolidayScreen> with SingleTickerProvider
             color: isPast ? Colors.grey[200] : Colors.white,
             borderRadius: BorderRadius.circular(12),
             boxShadow: isPast ? [] : [
-              BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))
+              BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4))
             ],
           ),
           child: Row(
@@ -124,7 +124,7 @@ class _HolidayScreenState extends State<HolidayScreen> with SingleTickerProvider
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: isPast ? Colors.grey[400] : themeColor.withOpacity(0.1),
+                  color: isPast ? Colors.grey[400] : themeColor.withValues(alpha: 0.1),
                   borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), bottomLeft: Radius.circular(12)),
                 ),
                 child: Column(
@@ -156,7 +156,7 @@ class _HolidayScreenState extends State<HolidayScreen> with SingleTickerProvider
                   padding: const EdgeInsets.only(right: 16),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                    decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
                     child: const Text("Upcoming", style: TextStyle(fontSize: 10, color: Colors.green, fontWeight: FontWeight.bold)),
                   ),
                 )
