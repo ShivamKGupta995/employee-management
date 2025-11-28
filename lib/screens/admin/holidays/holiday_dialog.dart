@@ -7,7 +7,7 @@ class HolidayDialog extends StatefulWidget {
   final HolidayModel? existingHoliday;
   final Function(HolidayModel) onSave;
 
-  const HolidayDialog({Key? key, this.existingHoliday, required this.onSave}) : super(key: key);
+  const HolidayDialog({super.key, this.existingHoliday, required this.onSave});
 
   @override
   State<HolidayDialog> createState() => _HolidayDialogState();
@@ -75,7 +75,7 @@ class _HolidayDialogState extends State<HolidayDialog> {
 
               // Type Dropdown
               DropdownButtonFormField<String>(
-                value: _selectedType,
+                initialValue: _selectedType,
                 decoration: const InputDecoration(
                   labelText: "Holiday Type",
                   border: OutlineInputBorder(),

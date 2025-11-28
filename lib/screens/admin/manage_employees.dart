@@ -28,6 +28,8 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController departmentController = TextEditingController();
   final TextEditingController roleController = TextEditingController();
+  final TextEditingController isFrozenController  = TextEditingController();
+  
 
   // Opens the dialog to Add or Edit
   void _openEmployeeDialog({DocumentSnapshot? employee}) {
@@ -37,6 +39,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
       nameController.text = data['name'] ?? '';
       emailController.text = data['email'] ?? '';
       phoneController.text = data['phone'] ?? '';
+      isFrozenController.text = data['isFrozen']?.toString() ?? 'false';
       departmentController.text = data['department'] ?? departmentList.first;
       roleController.text = data['role'] ?? roleList.last;
     } else {
@@ -44,6 +47,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
       nameController.clear();
       emailController.clear();
       phoneController.clear();
+      isFrozenController.text = 'false';
       // Set defaults
       departmentController.text = departmentList.first; 
       roleController.text = roleList.last; 
@@ -73,8 +77,14 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                 keyboardType: TextInputType.phone,
               ),
               const SizedBox(height: 10),
+              TextField(
+                controller: isFrozenController,
+                decoration: const InputDecoration(labelText: 'Is Frozen'),
+                keyboardType: TextInputType.text,
+              ),
+              const SizedBox(height: 10),
               DropdownButtonFormField<String>(
-                value: departmentList.contains(departmentController.text) 
+                initialValue: departmentList.contains(departmentController.text) 
                     ? departmentController.text 
                     : departmentList.first,
                 items: departmentList.map((department) {
@@ -90,7 +100,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
               ),
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
-                value: roleList.contains(roleController.text) 
+                initialValue: roleList.contains(roleController.text) 
                     ? roleController.text 
                     : roleList.last,
                 items: roleList.map((role) {
@@ -162,7 +172,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
           'department': departmentController.text.trim(),
           'role': roleController.text.trim(),
           'createdAt': FieldValue.serverTimestamp(),
-          'isFrozen': false, 
+          'isFrozen': isFrozenController.text.toLowerCase() == 'true' ? true : false, 
         });
 
         if (!mounted) return;
