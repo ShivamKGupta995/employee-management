@@ -16,12 +16,17 @@ class HolidayScreen extends StatefulWidget {
 class _HolidayScreenState extends State<HolidayScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final HolidayService _service = HolidayService();
+  
+  // ✅ Variable to store the current year
+  late int _currentYear;
   int _selectedYear = DateTime.now().year;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    // ✅ Initialize current year from system
+    _currentYear = DateTime.now().year;
   }
 
   @override
@@ -40,7 +45,7 @@ class _HolidayScreenState extends State<HolidayScreen> with SingleTickerProvider
               dropdownColor: Colors.blue.shade900,
               icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
               value: _selectedYear,
-              items: [2024, 2025, 2026].map((year) {
+              items: [_currentYear - 1, _currentYear, _currentYear + 1].map((year) {
                 return DropdownMenuItem(
                   value: year,
                   child: Text("$year", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -98,7 +103,10 @@ class _HolidayScreenState extends State<HolidayScreen> with SingleTickerProvider
       itemCount: holidays.length,
       itemBuilder: (context, index) {
         final holiday = holidays[index];
-        final bool isPast = holiday.date.isBefore(DateTime.now().subtract(const Duration(days: 1)));
+        // ✅ Check if holiday is in the past by comparing with current year and today's date
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final bool isPast = holiday.date.isBefore(today);
 
         return Container(
           margin: const EdgeInsets.only(bottom: 16),

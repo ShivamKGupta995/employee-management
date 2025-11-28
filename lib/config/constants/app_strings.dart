@@ -11,7 +11,7 @@ class AppStrings {
   // ==========================================
   static const String appName = 'Employee System';
   static const String appVersion = '1.0.0';
-  static const String companyName = 'Your Company';
+  static const String companyName = 'OSC Atelier';
 
   // ==========================================
   // AUTH SCREENS
