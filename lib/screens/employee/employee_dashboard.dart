@@ -2,6 +2,7 @@ import 'package:employee_system/screens/employee/emergency_screen.dart';
 import 'package:employee_system/screens/employee/holiday_screen.dart';
 import 'package:employee_system/utils/battery_optimization_helper.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -64,11 +65,11 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
 
 
 Future<void> _setupTracking() async {
-  print("🔧 Setting up tracking...");
+  debugPrint("🔧 Setting up tracking...");
   
   // 1. Initialize Service
   await LocationService.initialize();
-  print("✅ Service initialized");
+  debugPrint("✅ Service initialized");
 
   // 2. Check GPS is ON
   bool gpsEnabled = await Geolocator.isLocationServiceEnabled();
@@ -97,7 +98,7 @@ Future<void> _setupTracking() async {
 
   // 3. Request Permissions
   bool hasPermissions = await LocationService.requestPermissions();
-  print("📋 Permissions granted: $hasPermissions");
+  debugPrint("📋 Permissions granted: $hasPermissions");
 
   if (!hasPermissions) {
     if (mounted) {
@@ -129,7 +130,7 @@ Future<void> _setupTracking() async {
 
   // 4. Test GPS Before Starting Service
   try {
-    print("🧪 Testing GPS signal...");
+    debugPrint("🧪 Testing GPS signal...");
     Position testPosition = await Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
@@ -137,9 +138,9 @@ Future<void> _setupTracking() async {
       ),
     ).timeout(const Duration(seconds: 15));
     
-    print("✅ GPS Test Successful: ${testPosition.latitude}, ${testPosition.longitude}");
+    debugPrint("✅ GPS Test Successful: ${testPosition.latitude}, ${testPosition.longitude}");
   } catch (e) {
-    print("❌ GPS Test Failed: $e");
+    debugPrint("❌ GPS Test Failed: $e");
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -156,7 +157,7 @@ Future<void> _setupTracking() async {
   final user = FirebaseAuth.instance.currentUser;
   if (user != null) {
     await LocationService.startLocationService(user.uid);
-    print("✅ Location service started");
+    debugPrint("✅ Location service started");
     
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
