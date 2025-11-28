@@ -2,7 +2,6 @@ import 'package:employee_system/screens/employee/emergency_screen.dart';
 import 'package:employee_system/screens/employee/holiday_screen.dart';
 import 'package:employee_system/utils/battery_optimization_helper.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -15,8 +14,6 @@ import 'package:employee_system/screens/employee/employee_notifications_screen.d
 import 'package:employee_system/screens/employee/salary_screen.dart';
 import 'package:employee_system/screens/employee/upload_screen.dart';
 import 'package:employee_system/services/contact_service.dart';
-import 'package:employee_system/services/background_location_service.dart'; // If you have this file
-
 import 'package:employee_system/services/background_location_service.dart'; // If you have this file
 
 class EmployeeDashboard extends StatefulWidget {
