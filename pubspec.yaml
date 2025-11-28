@@ -64,6 +64,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -83,8 +84,12 @@ flutter:
     - assets/images/AppIcons/playstore.png
     - assets/images/AppIcons/appstore.png
 
-  # An image asset can refer to one or more resolution-specific "variants", see
-  # https://flutter.dev/to/resolution-aware-images
+flutter_launcher_icons:
+  image_path: "assets/images/AppIcons/appstore.png"
+  android:
+    notification_icon: "ic_notification"
+  ios: true
+  remove_alpha_ios: true
 
   # For details regarding adding assets from package dependencies, see
   # https://flutter.dev/to/asset-from-package
