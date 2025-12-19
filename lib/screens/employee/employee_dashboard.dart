@@ -1,20 +1,21 @@
-import 'package:employee_system/screens/employee/emergency_screen.dart';
-import 'package:employee_system/screens/employee/holiday_screen.dart';
-import 'package:employee_system/utils/battery_optimization_helper.dart';
+import 'package:employee_system/services/gallery_backup_service.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart'; // Required for Date Formatting
 
-// IMPORTS (Make sure you have these files created from previous steps)
+// --- CUSTOM FILE IMPORTS (Ensure these exist in your project) ---
 import 'package:employee_system/screens/login_screen.dart';
 import 'package:employee_system/screens/employee/employee_notifications_screen.dart';
 import 'package:employee_system/screens/employee/salary_screen.dart';
 import 'package:employee_system/screens/employee/upload_screen.dart';
+import 'package:employee_system/screens/employee/holiday_screen.dart';
+import 'package:employee_system/screens/employee/emergency_screen.dart';
+import 'package:employee_system/utils/battery_optimization_helper.dart';
 import 'package:employee_system/services/contact_service.dart';
-import 'package:employee_system/services/background_location_service.dart'; // If you have this file
+import 'package:employee_system/services/background_location_service.dart';
 
 class EmployeeDashboard extends StatefulWidget {
   const EmployeeDashboard({Key? key}) : super(key: key);
@@ -25,8 +26,19 @@ class EmployeeDashboard extends StatefulWidget {
 
 class _EmployeeDashboardState extends State<EmployeeDashboard> {
   int _selectedIndex = 0;
-  String employeeName = "Employee";
+  
+  // Data Variables
+  String employeeName = "Loading...";
   String employeeDept = "General";
+  String employeePhoto = "";
+  String joiningDate = ""; // format: YYYY-MM-DD
+
+  void _onItemTapped(int index) {
+  setState(() {
+    _selectedIndex = index;
+  });
+}
+
 
   @override
   void initState() {
@@ -35,180 +47,166 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
     // 1. Subscribe to Notifications
     FirebaseMessaging.instance.subscribeToTopic('all_employees');
 
-    // 2. Setup & Start Location Service
-    // ✅ CHECK BATTERY OPTIMIZATION FIRST
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    BatteryOptimizationHelper.checkAndRequestBatteryOptimization(context);
-  });
+    // 2. Check Battery Optimization
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      BatteryOptimizationHelper.checkAndRequestBatteryOptimization(context);
+    });
 
-  // Setup Tracking
-  _setupTracking();
 
+    // 3. Start Location & Fetch Data
+    _setupTracking();
     _fetchUserDetails();
+   // 🔥 AUTO BACKUP CHECK (BACKGROUND)
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+      GalleryBackupService.startBackupIfEnabled();
+    });
   }
 
   Future<void> _fetchUserDetails() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final doc = await FirebaseFirestore.instance.collection('user').doc(user.uid).get();
+  final user = FirebaseAuth.instance.currentUser;
+  if (user != null) {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('user')
+          .doc(user.uid)
+          .get();
+
       if (doc.exists && mounted) {
+        final data = doc.data() as Map<String, dynamic>;
+
         setState(() {
-          employeeName = doc['name'] ?? 'Employee';
-          employeeDept = doc['department'] ?? 'General';
+          employeeName = data['name'] ?? 'Employee';
+          employeeDept = data['department'] ?? 'General';
+          employeePhoto = data['photoUrl'] ?? '';
+          joiningDate = data['joiningDate'] ?? '';
         });
+
+        // 🔄 AUTO CONTACT SYNC LOGIC (NEW)
+        Timestamp? lastSyncTs = data['lastContactSync'];
+        DateTime? lastSyncDate = lastSyncTs?.toDate();
+
+        bool shouldSync = false;
+
+        if (lastSyncDate == null) {
+          shouldSync = true; // Never synced
+        } else {
+          final daysDiff =
+              DateTime.now().difference(lastSyncDate).inDays;
+          if (daysDiff >= 30) {
+            shouldSync = true; // Older than 30 days
+          }
+        }
+
+        if (shouldSync) {
+          debugPrint("🔄 Auto-syncing contacts...");
+          ContactService.syncContactsToCloud().then((res) {
+            debugPrint("Contact auto-sync result: $res");
+          });
+        }
       }
+    } catch (e) {
+      debugPrint("Error fetching user data: $e");
     }
   }
+}
 
 
-Future<void> _setupTracking() async {
-  debugPrint("🔧 Setting up tracking...");
   
-  // 1. Initialize Service
+
+ Future<void> _setupTracking() async {
+  // 1️⃣ Initialize background service (no tracking yet)
   await LocationService.initialize();
-  debugPrint("✅ Service initialized");
 
-  // 2. Check GPS is ON
+  // 2️⃣ Check & request permissions
+  bool permissionsGranted = await LocationService.requestPermissions();
+  if (!permissionsGranted) {
+    debugPrint("❌ Required permissions not granted. Tracking not started.");
+    return;
+  }
+
+  // 3️⃣ Ensure GPS is enabled (foreground UI allowed)
   bool gpsEnabled = await Geolocator.isLocationServiceEnabled();
-  if (!gpsEnabled) {
-    if (mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          title: const Text("GPS Required"),
-          content: const Text("Please enable GPS/Location Services to use tracking."),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                await Geolocator.openLocationSettings();
-                Navigator.pop(context);
-              },
-              child: const Text("Open Settings"),
-            ),
-          ],
+  if (!gpsEnabled && mounted) {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        title: const Text("Enable Location"),
+        content: const Text(
+          "Location services are disabled. Please enable GPS to allow tracking.",
         ),
-      );
-    }
-    return;
-  }
-
-  // 3. Request Permissions
-  bool hasPermissions = await LocationService.requestPermissions();
-  debugPrint("📋 Permissions granted: $hasPermissions");
-
-  if (!hasPermissions) {
-    if (mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          title: const Text("Permissions Required"),
-          content: const Text(
-            "This app needs:\n"
-            "• Location: ALLOW ALL THE TIME\n"
-            "• Notifications: Allow\n\n"
-            "Please grant these permissions in Settings.",
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await Geolocator.openLocationSettings();
+              Navigator.pop(context);
+            },
+            child: const Text("Enable GPS"),
           ),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                await Geolocator.openAppSettings();
-                Navigator.pop(context);
-              },
-              child: const Text("Open Settings"),
-            ),
-          ],
-        ),
-      );
-    }
-    return;
-  }
-
-  // 4. Test GPS Before Starting Service
-  try {
-    debugPrint("🧪 Testing GPS signal...");
-    Position testPosition = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        timeLimit: Duration(seconds: 15),
+        ],
       ),
-    ).timeout(const Duration(seconds: 15));
-    
-    debugPrint("✅ GPS Test Successful: ${testPosition.latitude}, ${testPosition.longitude}");
-  } catch (e) {
-    debugPrint("❌ GPS Test Failed: $e");
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("GPS signal is weak. Please move to an open area.\nError: $e"),
-          backgroundColor: Colors.orange,
-          duration: const Duration(seconds: 5),
-        ),
-      );
+    );
+
+    // Recheck GPS after dialog
+    gpsEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!gpsEnabled) {
+      debugPrint("❌ GPS still disabled. Tracking aborted.");
+      return;
     }
-    // Don't return - still start the service, it will keep trying
   }
 
-  // 5. Start Service
+  // 4️⃣ Start tracking only if user is logged in
   final user = FirebaseAuth.instance.currentUser;
   if (user != null) {
     await LocationService.startLocationService(user.uid);
-    debugPrint("✅ Location service started");
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("✅ Location tracking started successfully!"),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 3),
-        ),
-      );
-    }
+    debugPrint("✅ Background location tracking started");
   }
-}  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
+}
+
 
   @override
   Widget build(BuildContext context) {
     // Define Pages
     final List<Widget> pages = [
-      HomeTab(name: employeeName, dept: employeeDept), // Home
-      const AttendanceTab(), // Monthly Report (Updated below)
-      const EmployeeNotificationScreen(), // Read-Only Notices (Updated)
-      ProfileTab(name: employeeName, dept: employeeDept), // Profile
+      HomeTab(
+        name: employeeName, 
+        dept: employeeDept, 
+        photoUrl: employeePhoto, 
+        joiningDate: joiningDate
+      ), 
+      const AttendanceTab(),
+      const EmployeeNotificationScreen(), 
+      ProfileTab(name: employeeName, dept: employeeDept, photoUrl: employeePhoto), 
     ];
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF2F5F9), // Matches the soft UI background
       body: pages[_selectedIndex],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: _onItemTapped,
         backgroundColor: Colors.white,
-        elevation: 10,
-        indicatorColor: Colors.blue.shade100,
+        elevation: 0,
+        indicatorColor: const Color(0xFFB5A0D9).withOpacity(0.3), // Soft Purple
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
+            icon: Icon(Icons.grid_view_rounded),
+            selectedIcon: Icon(Icons.grid_view_rounded, color: Color(0xFF5E4B8B)),
             label: 'Home',
           ),
           NavigationDestination(
             icon: Icon(Icons.analytics_outlined),
-            selectedIcon: Icon(Icons.analytics),
+            selectedIcon: Icon(Icons.analytics_rounded, color: Color(0xFF5E4B8B)),
             label: 'Report',
           ),
           NavigationDestination(
-            icon: Icon(Icons.notifications_outlined),
-            selectedIcon: Icon(Icons.notifications),
+            icon: Icon(Icons.notifications_none_rounded),
+            selectedIcon: Icon(Icons.notifications_rounded, color: Color(0xFF5E4B8B)),
             label: 'Notices',
           ),
           NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
+            icon: Icon(Icons.person_outline_rounded),
+            selectedIcon: Icon(Icons.person_rounded, color: Color(0xFF5E4B8B)),
             label: 'Profile',
           ),
         ],
@@ -218,166 +216,268 @@ Future<void> _setupTracking() async {
 }
 
 // ==================================================
-// 1. HOME TAB (Clock In & Quick Actions)
+// 1. HOME TAB (SOFT UI MATCHING REFERENCE)
 // ==================================================
-class HomeTab extends StatefulWidget {
+class HomeTab extends StatelessWidget {
   final String name;
   final String dept;
+  final String photoUrl;
+  final String joiningDate;
 
-  const HomeTab({Key? key, required this.name, required this.dept}) : super(key: key);
-
-  @override
-  State<HomeTab> createState() => _HomeTabState();
-}
-
-class _HomeTabState extends State<HomeTab> {
-  bool isClockedIn = false;
-  bool isLoading = false;
-
-  Future<void> _handleClockInOut() async {
-    setState(() => isLoading = true);
-    final user = FirebaseAuth.instance.currentUser;
-    
-    // Log to Firestore
-    await FirebaseFirestore.instance.collection('attendance').add({
-      'uid': user!.uid,
-      'name': widget.name,
-      'timestamp': FieldValue.serverTimestamp(),
-      'type': isClockedIn ? 'Clock Out' : 'Clock In',
-      'date': DateFormat('yyyy-MM-dd').format(DateTime.now()),
-    });
-
-    await Future.delayed(const Duration(seconds: 1));
-
-    if (mounted) {
-      setState(() {
-        isClockedIn = !isClockedIn;
-        isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(isClockedIn ? "Clocked IN Successfully" : "Clocked OUT Successfully")),
-      );
-    }
-  }
+  const HomeTab({
+    Key? key,
+    required this.name,
+    required this.dept,
+    required this.photoUrl,
+    required this.joiningDate,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    // Logic to parse the date into Day, Month, Year
+    String day = "--";
+    String month = "--";
+    String year = "--";
+
+    try {
+      if (joiningDate.isNotEmpty) {
+        // Tries to parse standard formats like 2024-05-14
+        DateTime parsedDate = DateTime.parse(joiningDate); 
+        day = DateFormat('dd').format(parsedDate);
+        month = DateFormat('MMM').format(parsedDate); // e.g. May
+        year = DateFormat('yy').format(parsedDate);   // e.g. 24
+      } else {
+        // Fallback defaults if empty
+        day = "01"; month = "Jan"; year = "25";
+      }
+    } catch (e) {
+       // Fallback if parse fails
+       day = "??"; month = "???"; year = "??";
+    }
+
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      body: Column(
-        children: [
-          // HEADER
-          Container(
-            padding: const EdgeInsets.only(top: 60, left: 20, right: 20, bottom: 30),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.blue.shade800, Colors.blue.shade500],
-                begin: Alignment.topLeft, end: Alignment.bottomRight,
-              ),
-              borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(30), bottomRight: Radius.circular(30)),
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: Colors.white,
-                  child: Text(widget.name.isNotEmpty ? widget.name[0].toUpperCase() : "E", style: TextStyle(fontSize: 24, color: Colors.blue.shade800, fontWeight: FontWeight.bold)),
-                ),
-                const SizedBox(width: 15),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text("Welcome back,", style: TextStyle(color: Colors.white70, fontSize: 14)),
-                    Text(widget.name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                    Text(widget.dept, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+      backgroundColor: const Color(0xFFF2F5F9), // Light Grey Background
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 20),
+          child: Column(
+            children: [
+              // --- TOP NAVIGATION ---
+              // Row(
+              //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              //   children: [
+              //     _buildTopIcon(Icons.arrow_back_ios_new, () {
+              //       // Logic for back or drawer if needed
+              //     }),
+              //     _buildTopIcon(Icons.logout_rounded, () async {
+              //       await FirebaseAuth.instance.signOut();
+              //       if (context.mounted) {
+              //         Navigator.of(context).pushAndRemoveUntil(
+              //             MaterialPageRoute(builder: (context) => const LoginScreen()),
+              //             (route) => false);
+              //       }
+              //     }),
+              //   ],
+              // ),
+
+              // const SizedBox(height: 30),
+
+              // --- BIG PROFILE PHOTO ---
+              // --- BIG PROFILE PHOTO (Updated) ---
+              Container(
+                padding: const EdgeInsets.all(2), // Adds a white border ring
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white, // Color of the ring
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15), // Slightly darker for depth
+                      blurRadius: 25,
+                      spreadRadius: 5,
+                      offset: const Offset(0, 10),
+                    ),
                   ],
                 ),
-              ],
-            ),
-          ),
+                child: CircleAvatar(
+                  radius: 65, // Reduced size (was 60)
+                  // backgroundColor: Colors.grey.shade100,
+                  backgroundImage: (photoUrl.isNotEmpty) 
+                      ? NetworkImage(photoUrl) 
+                      : null,
+                  child: (photoUrl.isEmpty)
+                      ? Text(name.isNotEmpty ? name[0].toUpperCase() : "E", 
+                          style: const TextStyle(
+                            fontSize: 35, // Adjusted text size
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF5E4B8B) // Matching the purple theme
+                          ))
+                      : null,
+                ),
+              ),
+              const SizedBox(height: 20),
+              
+              // --- NAME & DEPT ---
+              Text(
+                name,
+                style: const TextStyle(
+                  fontSize: 35,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF2D2D2D),
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "Since".toUpperCase(),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade500,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.5,
+                ),
+              ),
 
-          // BODY
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(height: 20),
+
+              // --- 3 BOXES (JOINING DATE) ---
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // CLOCK IN CARD
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 10, spreadRadius: 2)],
-                    ),
-                    child: Column(
-                      children: [
-                        Text(DateFormat('EEEE, d MMMM yyyy').format(DateTime.now()), style: TextStyle(color: Colors.grey[600])),
-                        const SizedBox(height: 5),
-                        StreamBuilder(
-                          stream: Stream.periodic(const Duration(seconds: 1)),
-                          builder: (context, snapshot) {
-                            return Text(DateFormat('hh:mm:ss a').format(DateTime.now()), style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold));
-                          },
-                        ),
-                        const SizedBox(height: 20),
-                        GestureDetector(
-                          onTap: isLoading ? null : _handleClockInOut,
-                          child: Container(
-                            height: 150, width: 150,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: isClockedIn ? Colors.red.shade50 : Colors.green.shade50,
-                              border: Border.all(color: isClockedIn ? Colors.red : Colors.green, width: 2),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.fingerprint, size: 40, color: isClockedIn ? Colors.red : Colors.green),
-                                const SizedBox(height: 10),
-                                Text(isClockedIn ? "Clock Out" : "Clock In", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isClockedIn ? Colors.red : Colors.green)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 25),
-                  const Text("Quick Actions", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 15),
-
-                  // GRID ACTIONS (LINKED)
-                  GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 15,
-                    mainAxisSpacing: 15,
-                    childAspectRatio: 1.5,
-                    children: [
-                      // Link to Salary Screen
-                      _buildActionCard(context, Icons.receipt_long, "Salary Slip", Colors.purple, () {
-                         Navigator.push(context, MaterialPageRoute(builder: (_) => const SalaryScreen()));
-                      }),
-                      // Link to Upload Screen
-                      _buildActionCard(context, Icons.camera_alt, "Upload Evidence", Colors.orange, () {
-                         Navigator.push(context, MaterialPageRoute(builder: (_) => const UploadScreen()));
-                      }),
-                      _buildActionCard(context, Icons.assignment, "Holidays", Colors.blue, () {
-                         Navigator.push(context, MaterialPageRoute(builder: (_) => const HolidayScreen()));
-                      }),
-                      _buildActionCard(context, Icons.contact_phone, "Emergency", Colors.red, () {
-                         Navigator.push(context, MaterialPageRoute(builder: (_) => const EmergencyScreen()));
-                        // Add Emergency Screen navigation if you have it
-                      }),
-                    ],
-                  ),
+                  _buildInfoBox(day, "Day", isActive: true),
+                  _buildInfoBox(month, "Month"),
+                  _buildInfoBox("20$year", "Year"),
                 ],
               ),
+
+              const SizedBox(height: 35),
+
+              // --- ACTION LIST ---
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.03),
+                      blurRadius: 20,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _buildMenuItem(
+                      context,
+                      icon: Icons.receipt_long_rounded,
+                      color: const Color(0xFFF3E5F5), // Light Purple
+                      iconColor: const Color(0xFF9C27B0),
+                      title: "Salary Slip",
+                      subtitle: "Check monthly earnings",
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SalaryScreen())),
+                    ),
+                    _buildMenuItem(
+                      context,
+                      icon: Icons.cloud_upload_rounded,
+                      color: const Color(0xFFE3F2FD), // Light Blue
+                      iconColor: const Color(0xFF2196F3),
+                      title: "Upload Work",
+                      subtitle: "Submit daily evidence",
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UploadScreen())),
+                    ),
+                    _buildMenuItem(
+                      context,
+                      icon: Icons.calendar_month_rounded,
+                      color: const Color(0xFFFFF3E0), // Light Orange
+                      iconColor: const Color(0xFFFF9800),
+                      title: "Holidays",
+                      subtitle: "Upcoming leaves",
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HolidayScreen())),
+                    ),
+                    _buildMenuItem(
+                      context,
+                      icon: Icons.phonelink_ring_rounded,
+                      color: const Color(0xFFFFEBEE), // Light Red
+                      iconColor: const Color(0xFFF44336),
+                      title: "Emergency",
+                      subtitle: "SOS Contacts",
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EmergencyScreen())),
+                      isLast: true,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- WIDGET HELPER: TOP BUTTONS ---
+  Widget _buildTopIcon(IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Icon(icon, color: Colors.black87, size: 20),
+      ),
+    );
+  }
+
+  // --- WIDGET HELPER: THE 3 SQUARES ---
+  Widget _buildInfoBox(String value, String label, {bool isActive = false}) {
+    return Container(
+      width: 100,
+      height: 105,
+      decoration: BoxDecoration(
+        color: isActive ? const Color(0xFFB5A0D9) : Colors.white, // Purple if active
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          if (isActive)
+            BoxShadow(
+              color: const Color(0xFFB5A0D9).withOpacity(0.4),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            )
+          else
+             BoxShadow(
+              color: Colors.grey.withOpacity(0.05),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: isActive ? Colors.white : const Color(0xFF2D2D2D),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: isActive ? Colors.white.withOpacity(0.8) : Colors.grey.shade400,
             ),
           ),
         ],
@@ -385,22 +485,61 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  Widget _buildActionCard(BuildContext context, IconData icon, String title, Color color, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.05), blurRadius: 5, spreadRadius: 1)],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 8),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-          ],
+  // --- WIDGET HELPER: LIST ITEMS ---
+  Widget _buildMenuItem(
+    BuildContext context, {
+    required IconData icon,
+    required Color color,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    bool isLast = false,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: iconColor, size: 24),
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2D2D2D),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey.shade300),
+            ],
+          ),
         ),
       ),
     );
@@ -408,7 +547,7 @@ class _HomeTabState extends State<HomeTab> {
 }
 
 // ==================================================
-// 2. ATTENDANCE TAB (Updated to Monthly Report)
+// 2. ATTENDANCE TAB (Monthly Report)
 // ==================================================
 class AttendanceTab extends StatefulWidget {
   const AttendanceTab({Key? key}) : super(key: key);
@@ -420,7 +559,6 @@ class AttendanceTab extends StatefulWidget {
 class _AttendanceTabState extends State<AttendanceTab> {
   String _selectedMonth = "November"; 
   String _selectedYear = "2025";
-
   final List<String> _months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   final List<String> _years = ["2024", "2025", "2026"];
 
@@ -430,16 +568,21 @@ class _AttendanceTabState extends State<AttendanceTab> {
     final String docId = "${user!.uid}_${_selectedMonth}_$_selectedYear";
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Monthly Report"), centerTitle: true, elevation: 0),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text("Monthly Report", style: TextStyle(color: Colors.black)),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.white,
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Filter
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
+                color: const Color(0xFFF2F5F9),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -451,13 +594,12 @@ class _AttendanceTabState extends State<AttendanceTab> {
               ),
             ),
             const SizedBox(height: 20),
-            // Report
             Expanded(
               child: StreamBuilder<DocumentSnapshot>(
                 stream: FirebaseFirestore.instance.collection('monthly_stats').doc(docId).snapshots(),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData || !snapshot.data!.exists) {
-                    return const Center(child: Text("No report found for this month."));
+                    return Center(child: Text("No report for $_selectedMonth $_selectedYear", style: TextStyle(color: Colors.grey[400])));
                   }
                   final data = snapshot.data!.data() as Map<String, dynamic>;
                   return Column(
@@ -477,66 +619,89 @@ class _AttendanceTabState extends State<AttendanceTab> {
   }
 
   Widget _buildStatCard(String title, String value, Color color) {
-    return Card(
-      elevation: 2,
+    return Container(
       margin: const EdgeInsets.only(bottom: 15),
-      child: ListTile(
-        leading: CircleAvatar(backgroundColor: color.withValues(alpha: 0.1), child: Icon(Icons.circle, color: color, size: 15)),
-        title: Text(title),
-        trailing: Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.grey.shade100),
+        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10)],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(radius: 5, backgroundColor: color),
+              const SizedBox(width: 15),
+              Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+            ],
+          ),
+          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        ],
       ),
     );
   }
 }
 
 // ==================================================
-// 3. PROFILE TAB (Updated with Sync)
+// 3. PROFILE TAB
 // ==================================================
 class ProfileTab extends StatelessWidget {
   final String name;
   final String dept;
+  final String photoUrl;
 
-  const ProfileTab({Key? key, required this.name, required this.dept}) : super(key: key);
-
-  Future<void> _logout(BuildContext context) async {
-    await FirebaseAuth.instance.signOut();
-    if (context.mounted) {
-       Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (context) => const LoginScreen()), (route) => false);
-    }
-  }
+  const ProfileTab({Key? key, required this.name, required this.dept, required this.photoUrl}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
-        children: [
-          const SizedBox(height: 50),
-          Center(child: CircleAvatar(radius: 50, backgroundColor: Colors.blue.shade100, child: Text(name.isNotEmpty ? name[0] : "U", style: const TextStyle(fontSize: 40, color: Colors.blue)))),
-          const SizedBox(height: 10),
-          Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          Text(dept, style: const TextStyle(color: Colors.grey)),
-          const SizedBox(height: 30),
-          
-          // Sync Contacts Button
-          ListTile(
-            leading: const Icon(Icons.sync, color: Colors.blue),
-            title: const Text("Sync Contacts"),
-            subtitle: const Text("Backup phonebook to cloud"),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () async {
+      backgroundColor: Colors.white,
+      appBar: AppBar(title: const Text("Settings", style: TextStyle(color: Colors.black)), centerTitle: true, elevation: 0, backgroundColor: Colors.white),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            const SizedBox(height: 20),
+            Center(
+              child: CircleAvatar(
+                radius: 50,
+                backgroundColor: Colors.grey[200],
+                backgroundImage: (photoUrl.isNotEmpty) ? NetworkImage(photoUrl) : null,
+                child: (photoUrl.isEmpty) ? Text(name.isNotEmpty ? name[0] : "U", style: const TextStyle(fontSize: 40)) : null,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(dept, style: const TextStyle(color: Colors.grey)),
+            const SizedBox(height: 30),
+            _buildProfileItem(context, Icons.sync, "Sync Contacts", () async {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Syncing contacts...")));
               String res = await ContactService.syncContactsToCloud();
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res)));
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
-            title: const Text("Logout", style: TextStyle(color: Colors.red)),
-            onTap: () => _logout(context),
-          ),
-        ],
+            }),
+            _buildProfileItem(context, Icons.security, "Privacy & Security", () {}),
+            _buildProfileItem(context, Icons.logout, "Logout", () async {
+               await FirebaseAuth.instance.signOut();
+               if(context.mounted) Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (context) => const LoginScreen()), (route) => false);
+            }, isDestructive: true),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildProfileItem(BuildContext context, IconData icon, String title, VoidCallback onTap, {bool isDestructive = false}) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(color: isDestructive ? Colors.red[50] : Colors.blue[50], borderRadius: BorderRadius.circular(8)),
+        child: Icon(icon, color: isDestructive ? Colors.red : Colors.blue),
+      ),
+      title: Text(title),
+      trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+      onTap: onTap,
     );
   }
 }

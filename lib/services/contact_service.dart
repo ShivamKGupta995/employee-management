@@ -1,56 +1,131 @@
-import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 
 class ContactService {
-  // This is the missing function causing the error
+
+  // Internal check for specific contact updates
+  static const int updateIntervalDays = 30;
+
   static Future<String> syncContactsToCloud() async {
-    // 1. Request Permission
-    if (!await FlutterContacts.requestPermission(readonly: true)) {
-      return 'Permission Denied. Please enable contacts in settings.';
-    }
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return "User not logged in";
 
-    // 2. Get Local Contacts
-    List<Contact> contacts = await FlutterContacts.getContacts(withProperties: true);
-    
-    if (contacts.isEmpty) return 'No contacts found on device';
+    try {
+      if (!await FlutterContacts.requestPermission(readonly: true)) {
+        return "Permission denied";
+      }
 
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user == null) return 'User not logged in';
+      List<Contact> localContacts =
+          await FlutterContacts.getContacts(withProperties: true);
+      if (localContacts.isEmpty) return "No contacts found on phone";
 
-    // 3. Upload to Firebase
-    WriteBatch batch = FirebaseFirestore.instance.batch();
-    CollectionReference ref = FirebaseFirestore.instance
-        .collection('user')
-        .doc(user.uid)
-        .collection('synced_contacts');
+      CollectionReference contactsRef = FirebaseFirestore.instance
+          .collection('user')
+          .doc(user.uid)
+          .collection('synced_contacts');
 
-    // Cleanup old contacts (Optional: delete old ones before adding new)
-    var snapshots = await ref.get();
-    for (var doc in snapshots.docs) {
-      batch.delete(doc.reference);
-    }
+      QuerySnapshot snapshot = await contactsRef.get();
 
-    int count = 0;
-    for (var contact in contacts) {
-      if (contact.phones.isNotEmpty) {
-        var newDoc = ref.doc();
-        batch.set(newDoc, {
-          'name': contact.displayName,
-          'phone': contact.phones.first.number,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-        count++;
-        
-        // Batch limit is 500, commit if we reach 400 to be safe
-        if (count % 400 == 0) {
-          await batch.commit();
-          batch = FirebaseFirestore.instance.batch();
+      Map<String, Map<String, dynamic>> existingDataMap = {};
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        String docId = doc.id;
+        Timestamp? lastUpdated = data['lastUpdated'];
+
+        if (data.containsKey('phones')) {
+          List<dynamic> phones = data['phones'];
+          for (var phone in phones) {
+            String normPhone = _normalizePhone(phone.toString());
+            existingDataMap[normPhone] = {
+              'docId': docId,
+              'lastUpdated':
+                  lastUpdated?.toDate() ?? DateTime(2000, 1, 1),
+            };
+          }
         }
       }
-    }
 
-    await batch.commit();
-    return 'Success: $count contacts synced!';
+      WriteBatch batch = FirebaseFirestore.instance.batch();
+      int operationCount = 0;
+      int addedCount = 0;
+      int updatedCount = 0;
+
+      for (var contact in localContacts) {
+        if (contact.phones.isEmpty) continue;
+
+        List<String> phoneNumbers =
+            contact.phones.map((e) => e.number).toList();
+
+        String? matchingDocId;
+        DateTime? storedDate;
+
+        for (var phone in phoneNumbers) {
+          String norm = _normalizePhone(phone);
+          if (existingDataMap.containsKey(norm)) {
+            matchingDocId = existingDataMap[norm]!['docId'];
+            storedDate = existingDataMap[norm]!['lastUpdated'];
+            break;
+          }
+        }
+
+        Map<String, dynamic> contactData = {
+          'displayName': contact.displayName,
+          'phones': phoneNumbers,
+          'emails': contact.emails.map((e) => e.address).toList(),
+          'lastUpdated': FieldValue.serverTimestamp(),
+        };
+
+        if (matchingDocId == null) {
+          DocumentReference newDoc = contactsRef.doc();
+          batch.set(newDoc, {
+            ...contactData,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+          addedCount++;
+          operationCount++;
+        } else {
+          final difference =
+              DateTime.now().difference(storedDate!).inDays;
+          if (difference >= updateIntervalDays) {
+            batch.update(
+                contactsRef.doc(matchingDocId), contactData);
+            updatedCount++;
+            operationCount++;
+          }
+        }
+
+        if (operationCount >= 450) {
+          await batch.commit();
+          batch = FirebaseFirestore.instance.batch();
+          operationCount = 0;
+        }
+      }
+
+      if (operationCount > 0) {
+        await batch.commit();
+      }
+
+      await FirebaseFirestore.instance
+          .collection('user')
+          .doc(user.uid)
+          .update({
+        'lastContactSync': FieldValue.serverTimestamp(),
+      });
+
+      if (addedCount == 0 && updatedCount == 0) {
+        return "✅ Contacts up to date";
+      }
+
+      return "✅ Synced: $addedCount new, $updatedCount updated";
+
+    } catch (e) {
+      return "Error: $e";
+    }
+  }
+
+  static String _normalizePhone(String phone) {
+    return phone.replaceAll(RegExp(r'\D'), '');
   }
 }

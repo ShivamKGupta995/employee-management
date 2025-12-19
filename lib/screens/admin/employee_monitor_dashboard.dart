@@ -72,17 +72,72 @@ class _LiveMapTabState extends State<_LiveMapTab> {
   GoogleMapController? _mapController;
   bool _isFirstLoad = true;
 
+  DateTime? _selectedDate;
+  List<LatLng> _historyPoints = [];
+
+  // ─────────────────────────────────────────────
+  // OPEN GOOGLE MAPS NAVIGATION
+  // ─────────────────────────────────────────────
   Future<void> _openGoogleMaps(double lat, double lng) async {
     final uri = Uri.parse("google.navigation:q=$lat,$lng&mode=d");
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not launch Google Maps')),
-      );
     }
   }
 
+  // ─────────────────────────────────────────────
+  // PICK DATE (LAST 45 DAYS ONLY)
+  // ─────────────────────────────────────────────
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? now,
+      firstDate: now.subtract(const Duration(days: 45)),
+      lastDate: now,
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedDate = picked;
+        _historyPoints.clear();
+      });
+      await _loadHistoryForDay(picked);
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // LOAD HISTORY FOR SELECTED DAY ONLY
+  // ─────────────────────────────────────────────
+  Future<void> _loadHistoryForDay(DateTime day) async {
+    final start = DateTime(day.year, day.month, day.day);
+    final end = start.add(const Duration(days: 1));
+
+    final snapshot = await FirebaseFirestore.instance
+        .collection('user')
+        .doc(widget.employeeId)
+        .collection('location_history')
+        .where('timestamp', isGreaterThanOrEqualTo: start)
+        .where('timestamp', isLessThan: end)
+        .orderBy('timestamp')
+        .get();
+
+    final points = snapshot.docs.map((doc) {
+      final data = doc.data();
+      return LatLng(
+        (data['lat'] as num).toDouble(),
+        (data['lng'] as num).toDouble(),
+      );
+    }).toList();
+
+    if (mounted) {
+      setState(() => _historyPoints = points);
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // BUILD
+  // ─────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DocumentSnapshot>(
@@ -90,143 +145,160 @@ class _LiveMapTabState extends State<_LiveMapTab> {
           .collection('user')
           .doc(widget.employeeId)
           .snapshots(),
-      builder: (context, snapshot) {
-        // 1. Loading
-        if (snapshot.connectionState == ConnectionState.waiting) {
+      builder: (context, liveSnapshot) {
+        if (!liveSnapshot.hasData || !liveSnapshot.data!.exists) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        // 2. No Data
-        if (!snapshot.hasData || !snapshot.data!.exists) {
-          return const Center(child: Text("Employee data not found"));
+        final data = liveSnapshot.data!.data() as Map<String, dynamic>;
+
+        if (!data.containsKey('current_lat') ||
+            !data.containsKey('current_lng')) {
+          return const Center(child: Text("Tracking not started"));
         }
 
-        var data = snapshot.data!.data() as Map<String, dynamic>;
+        final LatLng livePos = LatLng(
+          (data['current_lat'] as num).toDouble(),
+          (data['current_lng'] as num).toDouble(),
+        );
 
-        // 3. Check for Location Data
-        if (!data.containsKey('current_lat') || !data.containsKey('current_lng')) {
-          return const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.location_off, size: 50, color: Colors.grey),
-                SizedBox(height: 10),
-                Text("Employee has not started tracking yet."),
-              ],
-            ),
-          );
-        }
-
-        // 4. Parse Data
-        double lat = (data['current_lat'] as num).toDouble();
-        double lng = (data['current_lng'] as num).toDouble();
-        LatLng pos = LatLng(lat, lng);
-        double speed = (data['speed'] as num?)?.toDouble() ?? 0.0;
-
-        // 5. Calculate "Online" Status
+        // ───────── ONLINE STATUS ─────────
         Timestamp? ts = data['last_seen'];
         bool isOnline = false;
         String statusText = "Offline";
-        Color statusColor = Colors.grey;
+        Color statusColor = Colors.red;
 
         if (ts != null) {
-          final lastSeen = ts.toDate();
-          final diff = DateTime.now().difference(lastSeen).inMinutes;
-          
+          final diff = DateTime.now().difference(ts.toDate()).inMinutes;
           if (diff < 5) {
             isOnline = true;
-            statusText = "🟢 Live Now (${(speed * 3.6).toStringAsFixed(1)} km/h)"; // Speed in km/h
+            statusText = "🟢 Live Now";
             statusColor = Colors.green;
           } else {
             statusText = "🔴 Last seen $diff min ago";
-            statusColor = Colors.red;
           }
         }
 
-        // 6. Camera Handling (Only move on first load to avoid jitter)
         if (_isFirstLoad && _mapController != null) {
-          _mapController!.animateCamera(CameraUpdate.newLatLng(pos));
+          _mapController!.animateCamera(
+            CameraUpdate.newLatLngZoom(livePos, 15),
+          );
           _isFirstLoad = false;
         }
 
         return Stack(
           children: [
+            // ───────── GOOGLE MAP ─────────
             GoogleMap(
-              initialCameraPosition: CameraPosition(target: pos, zoom: 15),
-              onMapCreated: (controller) {
-                _mapController = controller;
-              },
+              initialCameraPosition:
+                  CameraPosition(target: livePos, zoom: 15),
+              onMapCreated: (controller) => _mapController = controller,
+
+              // HISTORY ROUTE (ONE DAY ONLY)
+              polylines: _historyPoints.length > 1
+                  ? {
+                      Polyline(
+                        polylineId: const PolylineId("history"),
+                        points: _historyPoints,
+                        color: Colors.blueAccent,
+                        width: 5,
+                      ),
+                    }
+                  : {},
+
+              // LIVE MARKER
               markers: {
                 Marker(
-                  markerId: const MarkerId('emp'),
-                  position: pos,
-                  // Use a colored icon based on status if you have assets, 
-                  // otherwise default red pin is standard.
+                  markerId: const MarkerId("live"),
+                  position: livePos,
                   icon: BitmapDescriptor.defaultMarkerWithHue(
-                    isOnline ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed
+                    isOnline
+                        ? BitmapDescriptor.hueGreen
+                        : BitmapDescriptor.hueRed,
                   ),
                   infoWindow: InfoWindow(
-                    title: "Employee Location",
+                    title: "Employee",
                     snippet: statusText,
                   ),
-                )
+                ),
               },
             ),
 
-            // --- UI ELEMENT 1: STATUS PILL ---
+            // ───────── STATUS PILL ─────────
             Positioned(
               top: 20,
               left: 20,
               right: 20,
               child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(30),
-                  boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10)],
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black12, blurRadius: 10),
+                  ],
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.circle, color: statusColor, size: 14),
+                    Icon(Icons.circle, color: statusColor, size: 12),
                     const SizedBox(width: 10),
                     Text(
                       statusText,
-                      style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: statusColor,
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
 
-            // --- UI ELEMENT 2: CONTROLS ---
+            // ───────── DATE PICKER BUTTON ─────────
+            Positioned(
+              top: 80,
+              right: 20,
+              child: FloatingActionButton(
+                heroTag: "date",
+                backgroundColor: Colors.white,
+                child: const Icon(Icons.calendar_month, color: Colors.blue),
+                onPressed: _pickDate,
+              ),
+            ),
+
+            // ───────── CONTROLS ─────────
             Positioned(
               bottom: 30,
               left: 20,
               right: 20,
               child: Row(
                 children: [
-                  // Re-Center Button
                   FloatingActionButton(
                     heroTag: "center",
                     backgroundColor: Colors.white,
-                    child: const Icon(Icons.my_location, color: Colors.blue),
+                    child:
+                        const Icon(Icons.my_location, color: Colors.blue),
                     onPressed: () {
-                      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(pos, 16));
+                      _mapController?.animateCamera(
+                        CameraUpdate.newLatLngZoom(livePos, 16),
+                      );
                     },
                   ),
                   const SizedBox(width: 15),
-                  // Navigate Button
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () => _openGoogleMaps(lat, lng),
+                      onPressed: () =>
+                          _openGoogleMaps(livePos.latitude, livePos.longitude),
                       icon: const Icon(Icons.directions),
                       label: const Text("NAVIGATE"),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue[900],
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.all(15),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
                       ),
                     ),
                   ),
@@ -239,6 +311,8 @@ class _LiveMapTabState extends State<_LiveMapTab> {
     );
   }
 }
+
+
 // ===================================================
 // 2. CONTACTS TAB (Synced Data)
 // ===================================================
@@ -248,28 +322,151 @@ class _ContactsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Assumes Employee App uploads contacts to a sub-collection
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('user')
           .doc(employeeId)
           .collection('synced_contacts')
+          .orderBy('displayName')
           .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        if (snapshot.data!.docs.isEmpty) return const Center(child: Text("No contacts synced."));
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(
+            child: Text(
+              "No contacts synced",
+              style: TextStyle(color: Colors.grey),
+            ),
+          );
+        }
 
         return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
           itemCount: snapshot.data!.docs.length,
           itemBuilder: (context, index) {
-            var data = snapshot.data!.docs[index];
-            return ListTile(
-              leading: const Icon(Icons.person),
-              title: Text(data['name'] ?? 'Unknown'),
-              subtitle: Text(data['phone'] ?? ''),
-              trailing: IconButton(
-                icon: const Icon(Icons.call, color: Colors.green),
-                onPressed: () => launchUrl(Uri.parse("tel:${data['phone']}")),
+            final data =
+                snapshot.data!.docs[index].data() as Map<String, dynamic>;
+
+            final String name = data['displayName'] ?? 'Unknown';
+            final List phones = data['phones'] ?? [];
+            final List emails = data['emails'] ?? [];
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ───── HEADER ─────
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 22,
+                          backgroundColor: const Color(0xFFEEF2FF),
+                          child: Text(
+                            name.isNotEmpty
+                                ? name[0].toUpperCase()
+                                : "?",
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF5E4B8B),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            name,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // ───── PHONES ─────
+                    if (phones.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      const Divider(height: 1),
+                      const SizedBox(height: 10),
+                      ...phones.map((p) {
+                        final phone = p.toString();
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.phone,
+                                size: 18,
+                                color: Colors.green,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  phone,
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.call,
+                                  color: Colors.green,
+                                ),
+                                onPressed: () =>
+                                    launchUrl(Uri.parse("tel:$phone")),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+
+                    // ───── EMAILS ─────
+                    if (emails.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      ...emails.map((e) {
+                        final email = e.toString();
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.email_outlined,
+                                size: 18,
+                                color: Colors.blue,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  email,
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ],
+                ),
               ),
             );
           },

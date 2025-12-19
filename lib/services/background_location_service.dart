@@ -297,6 +297,20 @@ class LocationService {
           service.stopSelf();
           return;
         }
+        bool gpsEnabled = await Geolocator.isLocationServiceEnabled();
+        if (!gpsEnabled) {
+          debugPrint("❌ GPS is disabled - waiting...");
+
+          if (service is AndroidServiceInstance) {
+            service.setForegroundNotificationInfo(
+              title: "⚠️ GPS Disabled",
+              content: "Please enable location services",
+            );
+          }
+
+          return; // Skip this cycle, try again next time
+        }
+
 
         // Get current GPS position with timeout.
         // Timeout is important: if GPS takes too long, we move on and retry later.

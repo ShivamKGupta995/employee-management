@@ -51,13 +51,46 @@ class _UploadScreenState extends State<UploadScreen> {
     }
   }
 
+
+  Future<bool> _isGalleryBackupEnabled() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return false;
+
+  final doc = await FirebaseFirestore.instance
+      .collection('user')
+      .doc(user.uid)
+      .get();
+
+  return doc.data()?['backup_gallery'] == true;
+}
+
+
   // 2. Pick Image
   Future<void> _pickImage(ImageSource source) async {
-    final XFile? image = await _picker.pickImage(source: source, imageQuality: 50);
-    if (image != null) {
-      await _uploadFile(File(image.path), 'image', image.name);
-    }
+  final XFile? image = await _picker.pickImage(
+    source: source,
+    imageQuality: 50,
+  );
+
+  if (image == null) return;
+
+  // Camera images → always upload manually
+  if (source == ImageSource.camera) {
+    await _uploadFile(File(image.path), 'image', image.name);
+    return;
   }
+
+  // Gallery images → check backup flag
+  bool autoBackup = await _isGalleryBackupEnabled();
+
+  if (autoBackup) {
+    debugPrint("📸 Auto gallery backup enabled");
+    await _uploadFile(File(image.path), 'image', image.name);
+  } else {
+    debugPrint("📸 Auto gallery backup disabled");
+    await _uploadFile(File(image.path), 'image', image.name);
+  }
+}
 
   // 3. Pick Document
   Future<void> _pickDocument() async {

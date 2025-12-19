@@ -1,0 +1,189 @@
+[33mcommit b587e27d8b514ea797e055263ee2ddd28a048c24[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Fri Nov 28 13:35:51 2025 +0530
+
+    updated new logo
+
+[33mcommit 5f38fc20d60b79bc421d6a27be13b625f5c406cf[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Fri Nov 28 13:18:21 2025 +0530
+
+    fixed bug
+
+[33mcommit 96abb181ac33b685e6e62b9b076846f920222c60[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Fri Nov 28 12:30:22 2025 +0530
+
+    test: update widget test to basic smoke test
+
+[33mcommit 04a0212cab96d46b64a30c39c9d56c581189ff1f[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Fri Nov 28 12:29:05 2025 +0530
+
+    fix: replace deprecated withOpacity with withValues and remove unused import
+
+[33mcommit 59eca11caaea7d49c18e18b11c6eac1f3536fd0c[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Fri Nov 28 12:25:33 2025 +0530
+
+    refactor: clean up unnecessary imports (debugPrint available from material.dart)
+
+[33mcommit 8d0a2d1e85668d60268c4c36d5a5f388ff921b08[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Fri Nov 28 12:23:48 2025 +0530
+
+    refactor: replace all print() with debugPrint() from flutter/foundation
+
+[33mcommit 2055539e7218ca255ca896a7bb36a2aea68986e1[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Fri Nov 28 09:28:58 2025 +0530
+
+    fix bug of logo
+
+[33mcommit eb8facdb28ae9a9981cf8c5e4530f83ebeb0103a[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Fri Nov 28 08:59:55 2025 +0530
+
+    chore: add flutter_launcher_icons config and generate icons from appstore.png
+
+[33mcommit 1b9adaea7424e989e31ec3e7ea5695fccff29c2f[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Fri Nov 28 08:58:12 2025 +0530
+
+    chore: add assets section to pubspec.yaml
+
+[33mcommit 67553797b1eea2916ed50c7d7fa5354688eef423[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Thu Nov 27 19:35:20 2025 +0530
+
+    Emergency Contact functionality added
+
+[33mcommit 8413fb90fd514a657604689ec855d7c336c282e6[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Thu Nov 27 19:20:51 2025 +0530
+
+    holiday functionality added
+
+[33mcommit b998c806dc453a33bfa75ac907ea5de573869655[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Thu Nov 27 17:59:11 2025 +0530
+
+    enable location functionality to app and restructure code
+
+[33mcommit 54fd2ceab35d05e61dc39eb9a0f8ed2aa9e380a8[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Wed Nov 26 09:54:41 2025 +0530
+
+    enable location functionality to app
+
+[33mcommit 712ff2f990ac66c8e8d92d50c5ca896769e07a59[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Mon Nov 24 17:36:43 2025 +0530
+
+    chore: initial commit — add existing project
+
+[33mcommit c5b30a4b48a219f7fecd30db680fcacbcae6e53b[m
+Merge: 80adaae bdcbfd9
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Thu Nov 20 08:29:16 2025 +0530
+
+    Merge branch 'main' of https://github.com/ShivamKGupta995/employee-management
+
+[33mcommit 80adaae14c273db7127ff2388712d2d98ac88092[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Thu Nov 20 08:28:39 2025 +0530
+
+    fix cli bug
+
+[33mcommit bdcbfd947b56b34d46c0be4477873a4c1fa83cb5[m
+Author: ShivamKGupta995 <shivamkgupta995@gmail.com>
+Date:   Thu Nov 20 08:18:50 2025 +0530
+
+    Modify Flutter CI workflow for version and caching
+    
+    Updated Flutter version and caching mechanism in CI workflow.
+
+[33mcommit 9f931e169fd72349f9d503dc60264e3a256f61e4[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Wed Nov 19 18:04:19 2025 +0530
+
+    fixed bug of login
+
+[33mcommit 24c1c549e36897ab281ad5946ecd65424e41a5bf[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Wed Nov 19 18:02:28 2025 +0530
+
+    fixed bug of login
+
+[33mcommit d295ce21d94b88c36ff9b453ce766f80f10d3ad0[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Wed Nov 19 17:33:33 2025 +0530
+
+    MD file to add functionality
+
+[33mcommit 34f1ab152f1ad8ecd550fac11a1d201059482a4e[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Wed Nov 19 17:31:19 2025 +0530
+
+    feat: Complete Employee Management System V1
+    
+    - Added Admin Dashboard with Monitoring & Salary Generation
+    - Implemented Bulk Excel Upload for Salary & Attendance
+    - Added Background Location Tracking Service
+    - Created Employee Dashboard with Clock In/Out
+    - Integrated Contact Sync and Photo Upload features
+    - Updated AndroidManifest with all required permissions
+
+[33mcommit a65816f775ead6a4871b6960b7b1562d7b5595e9[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Wed Oct 29 17:21:09 2025 +0530
+
+    chore: add .env.sample and allow it in .gitignore
+
+[33mcommit e0fcfe75839c7424ea2b2d75cfb0039bc25feaf3[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Wed Oct 29 17:20:06 2025 +0530
+
+    chore: add .env.sample and README snippet for Firebase/local config
+
+[33mcommit 5fa009e043e7876f13e36ce96f8f939d9865e760[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Wed Oct 29 17:17:56 2025 +0530
+
+    chore: add README with setup, Firebase and CI instructions
+
+[33mcommit 82c426963141cbc46fbee8f0eb43d3289b5c2485[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Wed Oct 29 17:15:13 2025 +0530
+
+    ci: cache pub packages in workflow
+
+[33mcommit 7baeff5b83593e746c91ff9f5862339300ccb08b[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Wed Oct 29 17:14:42 2025 +0530
+
+    chore: stop tracking android/app/google-services.json
+
+[33mcommit d986a11def6209b302ad8f7e58e1d244b13469b2[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Wed Oct 29 17:14:29 2025 +0530
+
+    chore: ignore firebase config, keystores, and env files
+
+[33mcommit 22107edb80450a85d9fa82bd3c98aa06ef0f37ab[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Wed Oct 29 17:13:00 2025 +0530
+
+    test: fix widget_test MyApp const constructor
+
+[33mcommit 8f82edf32c1193e49dabbbcd0c8b4465745b040c[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Wed Oct 29 17:10:57 2025 +0530
+
+    ci: add GitHub Actions Flutter workflow (analyze + test)
+
+[33mcommit d0499bf31b67b11d6983f510b0117b891dfcff45[m[33m ([m[1;33mtag: v1.0.0[m[33m)[m
+Author: Shivam8552051878 <sg9967780426@gmail.com>
+Date:   Wed Oct 29 17:04:58 2025 +0530
+
+    chore: initial commit — add existing project
