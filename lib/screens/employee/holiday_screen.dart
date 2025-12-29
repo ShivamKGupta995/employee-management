@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
-// ✅ IMPORT THE MODEL
+import 'package:employee_system/config/constants/app_colors.dart'; // Adjust path
 import 'package:employee_system/models/holiday_model.dart';
-// ✅ IMPORT THE SERVICE
 import 'package:employee_system/services/holiday_service.dart';
 
 class HolidayScreen extends StatefulWidget {
@@ -17,7 +15,6 @@ class _HolidayScreenState extends State<HolidayScreen> with SingleTickerProvider
   late TabController _tabController;
   final HolidayService _service = HolidayService();
   
-  // ✅ Variable to store the current year
   late int _currentYear;
   int _selectedYear = DateTime.now().year;
 
@@ -25,142 +22,191 @@ class _HolidayScreenState extends State<HolidayScreen> with SingleTickerProvider
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    // ✅ Initialize current year from system
     _currentYear = DateTime.now().year;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: AppColors.luxDarkGreen,
       appBar: AppBar(
-        title: const Text("Holiday Calendar"),
-        backgroundColor: Colors.blue.shade800,
+        title: const Text("HOLIDAY CALENDAR", 
+          style: TextStyle(letterSpacing: 3, fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'serif')),
+        backgroundColor: AppColors.luxDarkGreen,
+        foregroundColor: AppColors.luxGold,
         elevation: 0,
         centerTitle: true,
         actions: [
-          // Year Selector
-          DropdownButtonHideUnderline(
-            child: DropdownButton<int>(
-              dropdownColor: Colors.blue.shade900,
-              icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
-              value: _selectedYear,
-              items: [_currentYear - 1, _currentYear, _currentYear + 1].map((year) {
-                return DropdownMenuItem(
-                  value: year,
-                  child: Text("$year", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                );
-              }).toList(),
-              onChanged: (val) => setState(() => _selectedYear = val!),
+          // Year Selector Styled for Luxury
+          Theme(
+            data: Theme.of(context).copyWith(canvasColor: AppColors.luxAccentGreen),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<int>(
+                icon: const Icon(Icons.calendar_month, color: AppColors.luxGold, size: 20),
+                value: _selectedYear,
+                items: [_currentYear - 1, _currentYear, _currentYear + 1].map((year) {
+                  return DropdownMenuItem(
+                    value: year,
+                    child: Text(" $year ", style: const TextStyle(color: AppColors.luxGold, fontWeight: FontWeight.bold)),
+                  );
+                }).toList(),
+                onChanged: (val) => setState(() => _selectedYear = val!),
+              ),
             ),
           ),
           const SizedBox(width: 15),
         ],
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: Colors.white,
+          indicatorColor: AppColors.luxGold,
           indicatorWeight: 3,
+          labelColor: AppColors.luxGold,
+          unselectedLabelColor: AppColors.luxGold.withValues(alpha: 0.4),
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, fontFamily: 'serif'),
           tabs: const [
-            Tab(text: "Public Holidays"),
-            Tab(text: "Company Holidays"),
+            Tab(text: "PUBLIC"),
+            Tab(text: "COMPANY"),
           ],
         ),
       ),
-      // ✅ FIX: Use 'HolidayModel' generic type
-      body: StreamBuilder<List<HolidayModel>>(
-        // ✅ FIX: Use correct method 'getHolidaysForYear'
-        stream: _service.getHolidaysForYear(_selectedYear),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return _buildEmptyState();
-          }
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment.center,
+            radius: 1.5,
+            colors: [Color(0xFF1D322C), AppColors.luxDarkGreen],
+          ),
+        ),
+        child: StreamBuilder<List<HolidayModel>>(
+          stream: _service.getHolidaysForYear(_selectedYear),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator(color: AppColors.luxGold));
+            }
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return _buildEmptyState();
+            }
 
-          final allHolidays = snapshot.data!;
-          final public = allHolidays.where((h) => h.type == 'Public').toList();
-          final company = allHolidays.where((h) => h.type == 'Company').toList();
+            final allHolidays = snapshot.data!;
+            final public = allHolidays.where((h) => h.type == 'Public').toList();
+            final company = allHolidays.where((h) => h.type == 'Company').toList();
 
-          return TabBarView(
-            controller: _tabController,
-            children: [
-              _buildList(public, Colors.red),
-              _buildList(company, Colors.blue),
-            ],
-          );
-        },
+            return TabBarView(
+              controller: _tabController,
+              children: [
+                _buildList(public),
+                _buildList(company),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 
-  // ✅ FIX: Ensure 'List<HolidayModel>' is recognized
-  Widget _buildList(List<HolidayModel> holidays, Color themeColor) {
+  Widget _buildList(List<HolidayModel> holidays) {
     if (holidays.isEmpty) return _buildEmptyState();
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
       itemCount: holidays.length,
       itemBuilder: (context, index) {
         final holiday = holidays[index];
-        // ✅ Check if holiday is in the past by comparing with current year and today's date
         final now = DateTime.now();
         final today = DateTime(now.year, now.month, now.day);
         final bool isPast = holiday.date.isBefore(today);
 
         return Container(
-          margin: const EdgeInsets.only(bottom: 16),
+          margin: const EdgeInsets.only(bottom: 20),
           decoration: BoxDecoration(
-            color: isPast ? Colors.grey[200] : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: isPast ? [] : [
-              BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4))
-            ],
+            color: isPast 
+                ? AppColors.luxAccentGreen.withValues(alpha: 0.1) 
+                : AppColors.luxAccentGreen.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(
+              color: isPast ? AppColors.luxGold.withValues(alpha: 0.1) : AppColors.luxGold.withValues(alpha: 0.3),
+              width: 1,
+            ),
           ),
-          child: Row(
-            children: [
-              // Date Box
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: isPast ? Colors.grey[400] : themeColor.withValues(alpha: 0.1),
-                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), bottomLeft: Radius.circular(12)),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(DateFormat('dd').format(holiday.date), style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: isPast ? Colors.white : themeColor)),
-                    Text(DateFormat('MMM').format(holiday.date).toUpperCase(), style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: isPast ? Colors.white : themeColor)),
-                  ],
-                ),
-              ),
-              // Details
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: IntrinsicHeight(
+            child: Row(
+              children: [
+                // Date Badge
+                Container(
+                  width: 75,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  decoration: BoxDecoration(
+                    color: isPast 
+                        ? Colors.transparent 
+                        : AppColors.luxGold.withValues(alpha: 0.05),
+                    borderRadius: const BorderRadius.only(topLeft: Radius.circular(15), bottomLeft: Radius.circular(15)),
+                    border: Border(right: BorderSide(color: AppColors.luxGold.withValues(alpha: 0.1))),
+                  ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(holiday.name, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isPast ? Colors.grey : Colors.black87, decoration: isPast ? TextDecoration.lineThrough : null)),
-                      const SizedBox(height: 4),
-                      // ✅ FIX: Use 'dayName' from the model helper we created
-                      Text(holiday.dayName, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+                      Text(DateFormat('dd').format(holiday.date), 
+                        style: TextStyle(
+                          fontSize: 24, 
+                          fontWeight: FontWeight.bold, 
+                          fontFamily: 'serif',
+                          color: isPast ? AppColors.luxGold.withValues(alpha: 0.3) : AppColors.luxGold
+                        )),
+                      Text(DateFormat('MMM').format(holiday.date).toUpperCase(), 
+                        style: TextStyle(
+                          fontSize: 12, 
+                          fontWeight: FontWeight.bold, 
+                          letterSpacing: 1,
+                          color: isPast ? AppColors.luxGold.withValues(alpha: 0.2) : AppColors.luxGold.withValues(alpha: 0.7)
+                        )),
                     ],
                   ),
                 ),
-              ),
-              // Badge
-              if (!isPast)
-                Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                    child: const Text("Upcoming", style: TextStyle(fontSize: 10, color: Colors.green, fontWeight: FontWeight.bold)),
+                
+                // Details
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(holiday.name, 
+                          style: TextStyle(
+                            fontSize: 16, 
+                            fontWeight: FontWeight.bold, 
+                            fontFamily: 'serif',
+                            color: isPast ? AppColors.luxGold.withValues(alpha: 0.3) : Colors.white,
+                            decoration: isPast ? TextDecoration.lineThrough : null
+                          )),
+                        const SizedBox(height: 6),
+                        Text(holiday.dayName.toUpperCase(), 
+                          style: TextStyle(
+                            color: AppColors.luxGold.withValues(alpha: 0.4), 
+                            fontSize: 10, 
+                            letterSpacing: 1.5
+                          )),
+                      ],
+                    ),
                   ),
-                )
-            ],
+                ),
+
+                // Status Indicator
+                if (!isPast)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 15),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.luxGold.withValues(alpha: 0.5)),
+                      ),
+                      child: const Text("UPCOMING", 
+                        style: TextStyle(fontSize: 8, color: AppColors.luxGold, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                    ),
+                  )
+              ],
+            ),
           ),
         );
       },
@@ -172,9 +218,10 @@ class _HolidayScreenState extends State<HolidayScreen> with SingleTickerProvider
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.event_busy, size: 60, color: Colors.grey[300]),
-          const SizedBox(height: 10),
-          Text("No holidays found", style: TextStyle(color: Colors.grey[500], fontSize: 16)),
+          Icon(Icons.event_busy_outlined, size: 60, color: AppColors.luxGold.withValues(alpha: 0.2)),
+          const SizedBox(height: 20),
+          Text("NO SCHEDULED EVENTS", 
+            style: TextStyle(color: AppColors.luxGold.withValues(alpha: 0.5), fontSize: 14, letterSpacing: 2, fontFamily: 'serif')),
         ],
       ),
     );
