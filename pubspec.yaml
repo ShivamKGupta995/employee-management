@@ -85,8 +85,7 @@ flutter:
     - assets/images/osc-light.png
     - assets/images/osc-gold-mini.png
     - assets/images/playstore.png
-    - assets/images/AppIcons/playstore.png
-    - assets/images/AppIcons/appstore.png
+
 
 flutter_launcher_icons:
   android: "launcher_icon"

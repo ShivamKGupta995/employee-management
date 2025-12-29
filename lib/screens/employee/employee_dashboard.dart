@@ -114,7 +114,7 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
           onTap: _onItemTapped,
           backgroundColor: luxDarkGreen,
           selectedItemColor: luxGold,
-          unselectedItemColor: luxGold.withOpacity(0.4),
+          unselectedItemColor: luxGold.withValues(alpha: 0.4),
           type: BottomNavigationBarType.fixed,
           showSelectedLabels: true,
           showUnselectedLabels: true,
@@ -243,7 +243,7 @@ class HomeTab extends StatelessWidget {
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: luxGold.withOpacity(0.5), width: 1),
+                  border: Border.all(color: luxGold.withValues(alpha: 0.5), width: 1),
                 ),
                 child: CircleAvatar(
                   radius: 60,
@@ -415,8 +415,8 @@ class HomeTab extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: luxGold.withOpacity(0.2)),
-          color: luxAccentGreen.withOpacity(0.2),
+          border: Border.all(color: luxGold.withValues(alpha: 0.2)),
+          color: luxAccentGreen.withValues(alpha: 0.2),
         ),
         child: Row(
           children: [
@@ -437,7 +437,7 @@ class HomeTab extends StatelessWidget {
                   Text(
                     sub,
                     style: TextStyle(
-                      color: luxGold.withOpacity(0.5),
+                      color: luxGold.withValues(alpha: 0.5),
                       fontSize: 12,
                     ),
                   ),
@@ -484,7 +484,7 @@ class AttendanceTab extends StatelessWidget {
               child: Text(
                 "This section will provide detailed reports about your work performance and attendance.",
                 textAlign: TextAlign.center,
-                style: TextStyle(color: luxGold.withOpacity(0.6), height: 1.5),
+                style: TextStyle(color: luxGold.withValues(alpha: 0.6), height: 1.5),
               ),
             ),
             const SizedBox(height: 40),
@@ -516,7 +516,7 @@ class AttendanceTab extends StatelessWidget {
           const SizedBox(width: 10),
           Text(
             text,
-            style: TextStyle(color: luxGold.withOpacity(0.8), fontSize: 15),
+            style: TextStyle(color: luxGold.withValues(alpha: 0.8), fontSize: 15),
           ),
         ],
       ),
@@ -571,16 +571,16 @@ class ProfileTab extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            Text(dept, style: TextStyle(color: luxGold.withOpacity(0.6))),
+            Text(dept, style: TextStyle(color: luxGold.withValues(alpha: 0.6))),
             const SizedBox(height: 40),
-            _buildSettingItem(Icons.sync, "Sync Contacts", () async {
-              await ContactService.syncContactsToCloud();
-            }),
-            _buildSettingItem(
-              Icons.privacy_tip_outlined,
-              "Privacy & Security",
-              () {},
-            ),
+            // _buildSettingItem(Icons.sync, "Sync Contacts", () async {
+            //   await ContactService.syncContactsToCloud();
+            // }),
+            // _buildSettingItem(
+            //   Icons.privacy_tip_outlined,
+            //   "Privacy & Security",
+            //   () {},
+            // ),
             _buildSettingItem(Icons.logout, "Logout", () async {
               await FirebaseAuth.instance.signOut();
               Navigator.of(context).pushAndRemoveUntil(
@@ -602,8 +602,8 @@ class ProfileTab extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: luxGold.withOpacity(0.2)),
-          color: luxAccentGreen.withOpacity(0.1),
+          border: Border.all(color: luxGold.withValues(alpha: 0.2)),
+          color: luxAccentGreen.withValues(alpha: 0.1),
         ),
         child: Row(
           children: [

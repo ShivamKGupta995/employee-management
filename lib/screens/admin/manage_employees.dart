@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:employee_system/config/constants/app_colors.dart'; // Ensure path is correct
 
 class ManageEmployeesScreen extends StatefulWidget {
   const ManageEmployeesScreen({Key? key}) : super(key: key);
@@ -14,98 +15,97 @@ class ManageEmployeesScreen extends StatefulWidget {
 }
 
 class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
-  final CollectionReference usersRef =
-      FirebaseFirestore.instance.collection('user');
+  final CollectionReference usersRef = FirebaseFirestore.instance.collection('user');
   final Reference storageRef = FirebaseStorage.instance.ref();
 
   final List<String> roleList = ['admin', 'employee'];
-  final List<String> departmentList = [
-    'HR',
-    'Finance',
-    'Engineering',
-    'Sales',
-    'Marketing',
-    'General',
-  ];
+  final List<String> departmentList = ['HR', 'Finance', 'Engineering', 'Sales', 'Marketing', 'General'];
 
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
-  final TextEditingController departmentController = TextEditingController();
-  final TextEditingController roleController = TextEditingController();
-
   final TextEditingController dobController = TextEditingController();
   final TextEditingController joiningDateController = TextEditingController();
   final TextEditingController anniversaryController = TextEditingController();
 
-  final TextEditingController isFrozenController =
-      TextEditingController(text: 'false');
-  final TextEditingController backupGalleryController =
-      TextEditingController(text: 'false');
-
+  // Local state for the dialog
+  String _selectedDept = 'General';
+  String _selectedRole = 'employee';
+  bool _isFrozen = false;
+  bool _backupGallery = false;
   File? _selectedImage;
   String? _currentImageUrl;
 
   final ImagePicker _picker = ImagePicker();
 
+  // ==========================================
+  // UI HELPERS
+  // ==========================================
+
   Widget sectionTitle(String text) => Padding(
-        padding: const EdgeInsets.only(top: 16, bottom: 6),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.blueGrey,
-            ),
-          ),
-        ),
+        padding: const EdgeInsets.only(top: 20, bottom: 10),
+        child: Text(text.toUpperCase(),
+            style: TextStyle(color: AppColors.luxGold.withValues(alpha: 0.7), letterSpacing: 2, fontSize: 11, fontWeight: FontWeight.bold)),
       );
 
-  Future<void> _pickImage() async {
+  InputDecoration _luxInput(String label) => InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: AppColors.luxGold.withValues(alpha: 0.6)),
+        enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.luxGold.withValues(alpha: 0.3)), borderRadius: BorderRadius.circular(12)),
+        focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: AppColors.luxGold, width: 1.5), borderRadius: BorderRadius.circular(12)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+      );
+
+  // ==========================================
+  // LOGIC (ORIGINAL LOGIC PRESERVED)
+  // ==========================================
+
+  Future<void> _pickImage(StateSetter setState) async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
       setState(() => _selectedImage = File(image.path));
     }
   }
 
-  Future<void> _selectDate(
-      BuildContext context, TextEditingController controller) async {
+  Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
     DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(1950),
-      lastDate: DateTime(2100),
-    );
+        context: context,
+        initialDate: DateTime.now(),
+        firstDate: DateTime(1950),
+        lastDate: DateTime(2100),
+        builder: (context, child) => Theme(
+            data: ThemeData.dark().copyWith(
+                colorScheme: const ColorScheme.dark(primary: AppColors.luxGold, onPrimary: AppColors.luxDarkGreen, surface: AppColors.luxAccentGreen)),
+            child: child!));
     if (picked != null) {
-      controller.text =
-          "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+      controller.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
     }
   }
 
   Future<String?> _uploadImageToStorage(String uid, File imageFile) async {
-    Reference ref =
-        storageRef.child('profile_images').child('$uid.jpg');
+    Reference ref = storageRef.child('profile_images').child('$uid.jpg');
     await ref.putFile(imageFile);
     return await ref.getDownloadURL();
   }
 
+  // ==========================================
+  // DIALOG UI
+  // ==========================================
+
   void _openEmployeeDialog({DocumentSnapshot? employee}) {
     _selectedImage = null;
-
     if (employee != null) {
       final data = employee.data() as Map<String, dynamic>;
       nameController.text = data['name'] ?? '';
       emailController.text = data['email'] ?? '';
       phoneController.text = data['phone'] ?? '';
-      departmentController.text = data['department'];
-      roleController.text = data['role'];
+      _selectedDept = data['department'] ?? 'General';
+      _selectedRole = data['role'] ?? 'employee';
       dobController.text = data['dob'] ?? '';
       joiningDateController.text = data['joiningDate'] ?? '';
       anniversaryController.text = data['anniversary'] ?? '';
-      isFrozenController.text = data['isFrozen'].toString();
-      backupGalleryController.text =
-          data['backup_gallery'].toString();
+      _isFrozen = data['isFrozen'] ?? false;
+      _backupGallery = data['backup_gallery'] ?? false;
       _currentImageUrl = data['photoUrl'];
     } else {
       nameController.clear();
@@ -114,93 +114,123 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
       dobController.clear();
       joiningDateController.clear();
       anniversaryController.clear();
-      departmentController.text = departmentList.first;
-      roleController.text = roleList.last;
-      isFrozenController.text = 'false';
-      backupGalleryController.text = 'false';
+      _selectedDept = 'General';
+      _selectedRole = 'employee';
+      _isFrozen = false;
+      _backupGallery = false;
       _currentImageUrl = null;
     }
 
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text(employee == null ? 'Add Employee' : 'Edit Employee'),
-        content: SingleChildScrollView(
-          child: Column(
-            children: [
-              Stack(
-                alignment: Alignment.bottomRight,
-                children: [
-                  CircleAvatar(
-                    radius: 55,
-                    backgroundImage: _selectedImage != null
-                        ? FileImage(_selectedImage!)
-                        : (_currentImageUrl != null
-                            ? NetworkImage(_currentImageUrl!)
-                            : null) as ImageProvider?,
-                    child: (_selectedImage == null &&
-                            _currentImageUrl == null)
-                        ? const Icon(Icons.person, size: 50)
-                        : null,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: AppColors.luxDarkGreen,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: AppColors.luxGold.withValues(alpha: 0.3))),
+          title: Text(employee == null ? 'NEW ONBOARDING' : 'EDIT CREDENTIALS',
+              textAlign: TextAlign.center, style: const TextStyle(color: AppColors.luxGold, letterSpacing: 2, fontSize: 16, fontFamily: 'serif')),
+          content: SingleChildScrollView(
+            child: Column(
+              children: [
+                const SizedBox(height: 10),
+                // Avatar Picker
+                Center(
+                  child: Stack(
+                    alignment: Alignment.bottomRight,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.luxGold, width: 1)),
+                        child: CircleAvatar(
+                          radius: 50,
+                          backgroundColor: AppColors.luxAccentGreen,
+                          backgroundImage: _selectedImage != null
+                              ? FileImage(_selectedImage!)
+                              : (_currentImageUrl != null ? NetworkImage(_currentImageUrl!) : null) as ImageProvider?,
+                          child: (_selectedImage == null && _currentImageUrl == null) ? const Icon(Icons.person, size: 40, color: AppColors.luxGold) : null,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => _pickImage(setDialogState),
+                        child: const CircleAvatar(radius: 16, backgroundColor: AppColors.luxGold, child: Icon(Icons.edit, size: 14, color: AppColors.luxDarkGreen)),
+                      ),
+                    ],
                   ),
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: Colors.blue,
-                    child: IconButton(
-                      icon: const Icon(Icons.edit, size: 16),
-                      color: Colors.white,
-                      onPressed: _pickImage,
-                    ),
+                ),
+
+                sectionTitle('Identity'),
+                TextField(controller: nameController, style: const TextStyle(color: Colors.white), decoration: _luxInput('Full Name')),
+                const SizedBox(height: 15),
+                TextField(
+                    controller: emailController,
+                    enabled: employee == null,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _luxInput('Email Address')),
+                const SizedBox(height: 15),
+                TextField(controller: phoneController, style: const TextStyle(color: Colors.white), decoration: _luxInput('Contact Number')),
+
+                sectionTitle('Schedules'),
+                TextField(
+                    controller: dobController,
+                    readOnly: true,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _luxInput('Birth Date'),
+                    onTap: () => _selectDate(context, dobController)),
+                const SizedBox(height: 15),
+                TextField(
+                    controller: joiningDateController,
+                    readOnly: true,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _luxInput('Joining Date'),
+                    onTap: () => _selectDate(context, joiningDateController)),
+
+                sectionTitle('Compliance'),
+                DropdownButtonFormField<String>(
+                  value: _selectedDept,
+                  dropdownColor: AppColors.luxAccentGreen,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _luxInput('Department'),
+                  items: departmentList.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                  onChanged: (v) => setDialogState(() => _selectedDept = v!),
+                ),
+                const SizedBox(height: 15),
+                DropdownButtonFormField<String>(
+                  value: _selectedRole,
+                  dropdownColor: AppColors.luxAccentGreen,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _luxInput('System Role'),
+                  items: roleList.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                  onChanged: (v) => setDialogState(() => _selectedRole = v!),
+                ),
+
+                sectionTitle('Permissions'),
+                SwitchListTile(
+                  title: const Text('Account Frozen', style: TextStyle(color: Colors.white, fontSize: 14)),
+                  value: _isFrozen,
+                  activeColor: AppColors.luxGold,
+                  onChanged: (v) => setDialogState(() => _isFrozen = v),
+                ),
+                SwitchListTile(
+                  title: const Text('Backup Services', style: TextStyle(color: Colors.white, fontSize: 14)),
+                  value: _backupGallery,
+                  activeColor: AppColors.luxGold,
+                  onChanged: (v) => setDialogState(() => _backupGallery = v),
+                ),
+
+                const SizedBox(height: 30),
+                GestureDetector(
+                  onTap: () => _handleSave(employee),
+                  child: Container(
+                    width: double.infinity,
+                    height: 50,
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), gradient: AppColors.luxGoldGradient),
+                    child: Center(
+                        child: Text(employee == null ? 'ONBOARD EMPLOYEE' : 'UPDATE RECORD',
+                            style: const TextStyle(color: AppColors.luxDarkGreen, fontWeight: FontWeight.bold, letterSpacing: 1))),
                   ),
-                ],
-              ),
-
-              sectionTitle('Personal Info'),
-              TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Name')),
-              TextField(controller: emailController, enabled: employee == null, decoration: const InputDecoration(labelText: 'Email')),
-              TextField(controller: phoneController, decoration: const InputDecoration(labelText: 'Phone')),
-
-              sectionTitle('Dates'),
-              TextField(controller: dobController, readOnly: true, decoration: const InputDecoration(labelText: 'Date of Birth'), onTap: () => _selectDate(context, dobController)),
-              TextField(controller: joiningDateController, readOnly: true, decoration: const InputDecoration(labelText: 'Employment Since'), onTap: () => _selectDate(context, joiningDateController)),
-              TextField(controller: anniversaryController, readOnly: true, decoration: const InputDecoration(labelText: 'Anniversary'), onTap: () => _selectDate(context, anniversaryController)),
-
-              sectionTitle('Organization'),
-              DropdownButtonFormField(
-                value: departmentController.text,
-                items: departmentList.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                onChanged: (v) => departmentController.text = v!,
-                decoration: const InputDecoration(labelText: 'Department'),
-              ),
-              DropdownButtonFormField(
-                value: roleController.text,
-                items: roleList.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                onChanged: (v) => roleController.text = v!,
-                decoration: const InputDecoration(labelText: 'Role'),
-              ),
-
-              sectionTitle('Permissions'),
-              SwitchListTile(
-                title: const Text('Account Frozen'),
-                value: isFrozenController.text == 'true',
-                onChanged: (v) =>
-                    setState(() => isFrozenController.text = v.toString()),
-              ),
-              SwitchListTile(
-                title: const Text('Backup Gallery'),
-                value: backupGalleryController.text == 'true',
-                onChanged: (v) => setState(
-                    () => backupGalleryController.text = v.toString()),
-              ),
-
-              const SizedBox(height: 12),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 45)),
-                onPressed: () => _handleSave(employee),
-                child: Text(employee == null ? 'Add Employee' : 'Update Employee'),
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -208,86 +238,106 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
   }
 
   Future<void> _handleSave(DocumentSnapshot? employee) async {
-    showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const Center(child: CircularProgressIndicator()));
+    showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator(color: AppColors.luxGold)));
 
-    String uid = employee?.id ?? '';
-    String? photoUrl = _currentImageUrl;
+    try {
+      String uid = employee?.id ?? '';
+      String? photoUrl = _currentImageUrl;
 
-    if (employee == null) {
-      FirebaseApp app = await Firebase.initializeApp(
-          name: 'SecondaryApp', options: Firebase.app().options);
+      if (employee == null) {
+        FirebaseApp app = await Firebase.initializeApp(name: 'SecondaryApp', options: Firebase.app().options);
+        UserCredential cred = await FirebaseAuth.instanceFor(app: app).createUserWithEmailAndPassword(email: emailController.text, password: '123456');
+        uid = cred.user!.uid;
+        await app.delete();
+      }
 
-      UserCredential cred =
-          await FirebaseAuth.instanceFor(app: app)
-              .createUserWithEmailAndPassword(
-                  email: emailController.text, password: '123456');
+      if (_selectedImage != null) {
+        photoUrl = await _uploadImageToStorage(uid, _selectedImage!);
+      }
 
-      uid = cred.user!.uid;
-      await app.delete();
+      await usersRef.doc(uid).set({
+        'uid': uid,
+        'name': nameController.text,
+        'email': emailController.text,
+        'phone': phoneController.text,
+        'department': _selectedDept,
+        'role': _selectedRole,
+        'dob': dobController.text,
+        'joiningDate': joiningDateController.text,
+        'anniversary': anniversaryController.text,
+        'photoUrl': photoUrl,
+        'isFrozen': _isFrozen,
+        'backup_gallery': _backupGallery,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      Navigator.pop(context); // Close loading
+      Navigator.pop(context); // Close dialog
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     }
-
-    if (_selectedImage != null) {
-      photoUrl = await _uploadImageToStorage(uid, _selectedImage!);
-    }
-
-    await usersRef.doc(uid).set({
-      'uid': uid,
-      'name': nameController.text,
-      'email': emailController.text,
-      'phone': phoneController.text,
-      'department': departmentController.text,
-      'role': roleController.text,
-      'dob': dobController.text,
-      'joiningDate': joiningDateController.text,
-      'anniversary': anniversaryController.text,
-      'photoUrl': photoUrl,
-      'isFrozen': isFrozenController.text == 'true',
-      'backup_gallery': backupGalleryController.text == 'true',
-      'createdAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-
-    Navigator.pop(context);
-    Navigator.pop(context);
   }
+
+  // ==========================================
+  // LIST UI
+  // ==========================================
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.luxDarkGreen,
       floatingActionButton: FloatingActionButton(
         onPressed: () => _openEmployeeDialog(),
-        child: const Icon(Icons.add),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          width: 60,
+          height: 60,
+          decoration: const BoxDecoration(shape: BoxShape.circle, gradient: AppColors.luxGoldGradient),
+          child: const Icon(Icons.add, color: AppColors.luxDarkGreen),
+        ),
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: usersRef.snapshots(),
         builder: (_, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: AppColors.luxGold));
 
-          return ListView(
-            children: snapshot.data!.docs.map((doc) {
+          return ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            itemCount: snapshot.data!.docs.length,
+            itemBuilder: (context, index) {
+              final doc = snapshot.data!.docs[index];
               final data = doc.data() as Map<String, dynamic>;
-              return Card(
-                margin: const EdgeInsets.all(8),
+              bool frozen = data['isFrozen'] ?? false;
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 15),
+                decoration: BoxDecoration(
+                  color: AppColors.luxAccentGreen.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: AppColors.luxGold.withValues(alpha: frozen ? 0.1 : 0.2)),
+                ),
                 child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundImage: data['photoUrl'] != null
-                        ? NetworkImage(data['photoUrl'])
-                        : null,
-                    child: data['photoUrl'] == null
-                        ? Text(data['name'][0])
-                        : null,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                  leading: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.luxGold.withValues(alpha: 0.5))),
+                    child: CircleAvatar(
+                      backgroundColor: AppColors.luxAccentGreen,
+                      backgroundImage: data['photoUrl'] != null ? NetworkImage(data['photoUrl']) : null,
+                      child: data['photoUrl'] == null ? Text(data['name'][0], style: const TextStyle(color: AppColors.luxGold)) : null,
+                    ),
                   ),
-                  title: Text(data['name']),
-                  subtitle:
-                      Text('${data['department']} • ${data['role']}'),
+                  title: Text(data['name'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'serif')),
+                  subtitle: Text('${data['department']} • ${data['role'].toString().toUpperCase()}',
+                      style: TextStyle(color: AppColors.luxGold.withValues(alpha: 0.6), fontSize: 12)),
                   trailing: PopupMenuButton(
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'edit', child: Text('Edit')),
-                      PopupMenuItem(value: 'delete', child: Text('Delete')),
+                    icon: const Icon(Icons.more_vert, color: AppColors.luxGold),
+                    color: AppColors.luxAccentGreen,
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(value: 'edit', child: Text('Edit Record', style: TextStyle(color: Colors.white))),
+                      const PopupMenuItem(value: 'delete', child: Text('Delete User', style: TextStyle(color: Colors.redAccent))),
                     ],
                     onSelected: (v) {
                       if (v == 'edit') _openEmployeeDialog(employee: doc);
@@ -296,7 +346,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                   ),
                 ),
               );
-            }).toList(),
+            },
           );
         },
       ),

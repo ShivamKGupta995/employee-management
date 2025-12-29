@@ -88,7 +88,7 @@ class AppColors {
     }
   }
 
-  static Color withOpacity(Color color, double opacity) {
+  static Color withValues(Color color, double opacity) {
     return color.withValues(alpha: opacity);
   }
 }

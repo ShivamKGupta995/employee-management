@@ -20,7 +20,7 @@ Date:   Fri Nov 28 12:30:22 2025 +0530
 Author: Shivam8552051878 <sg9967780426@gmail.com>
 Date:   Fri Nov 28 12:29:05 2025 +0530
 
-    fix: replace deprecated withOpacity with withValues and remove unused import
+    fix: replace deprecated withValues with withValues and remove unused import
 
 [33mcommit 59eca11caaea7d49c18e18b11c6eac1f3536fd0c[m
 Author: Shivam8552051878 <sg9967780426@gmail.com>

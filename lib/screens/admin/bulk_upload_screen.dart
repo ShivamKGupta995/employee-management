@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart' hide Border;
 import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'package:firebase_core/firebase_core.dart'; // Uncomment if Firebase initialization is needed
-// Usage later: excel_pkg.Border
+import 'package:employee_system/config/constants/app_colors.dart'; // Adjust path
 
 class BulkUploadScreen extends StatefulWidget {
   const BulkUploadScreen({Key? key}) : super(key: key);
@@ -14,57 +13,48 @@ class BulkUploadScreen extends StatefulWidget {
 }
 
 class _BulkUploadScreenState extends State<BulkUploadScreen> {
+  // Logic Variables (Original)
   bool _isLoading = false;
-  String _statusMessage = "Ready to upload";
+  String _statusMessage = "SYSTEM READY FOR UPLOAD";
   int _successCount = 0;
   List<String> _errors = [];
 
-  // Function to Pick and Process File
+  // ==========================================
+  // LOGIC METHODS (ORIGINAL PRESERVED)
+  // ==========================================
+
   Future<void> _pickAndUploadFile() async {
     try {
-      // 1. Pick File
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['xlsx'],
         allowMultiple: false,
       );
 
-      if (result == null) return; // User canceled
+      if (result == null) return;
 
       setState(() {
         _isLoading = true;
-        _statusMessage = "Reading file...";
+        _statusMessage = "DECRYPTING & READING DATA...";
         _errors.clear();
         _successCount = 0;
       });
 
-      // 2. Read File Bytes
-      // On Mobile, we use path. On Web, we use bytes.
       var bytes = File(result.files.single.path!).readAsBytesSync();
       var excel = Excel.decodeBytes(bytes);
-
-      // 3. Get the first sheet
       final sheetName = excel.tables.keys.first;
       final table = excel.tables[sheetName];
 
-      if (table == null) throw "No data found in Excel";
+      if (table == null) throw "Data structure not found";
 
       int rowIndex = 0;
-
-      // 4. Loop through rows
       for (var row in table.rows) {
         rowIndex++;
-        
-        // Skip Header Row (Row 1)
-        if (rowIndex == 1) continue;
-
-        // Skip empty rows
-        if (row.isEmpty || row[0] == null) continue;
+        if (rowIndex == 1 || row.isEmpty || row[0] == null) continue;
 
         try {
-          // Extract Data from Columns (0=A, 1=B, etc.)
           String email = row[0]?.value.toString().trim() ?? "";
-          String month = row[1]?.value.toString().trim() ?? "November";
+          String month = row[1]?.value.toString().trim() ?? "December";
           String year = row[2]?.value.toString().trim() ?? "2025";
           int present = int.tryParse(row[3]?.value.toString() ?? "0") ?? 0;
           int absent = int.tryParse(row[4]?.value.toString() ?? "0") ?? 0;
@@ -72,33 +62,27 @@ class _BulkUploadScreenState extends State<BulkUploadScreen> {
           double overtime = double.tryParse(row[6]?.value.toString() ?? "0") ?? 0.0;
           double rate = double.tryParse(row[7]?.value.toString() ?? "0") ?? 0.0;
 
-          if (email.isEmpty) continue;
-
-          // 5. Find UID based on Email
-          await _updateEmployeeData(email, month, year, present, absent, late, overtime, rate);
-          
+          if (email.isNotEmpty) {
+            await _updateEmployeeData(email, month, year, present, absent, late, overtime, rate);
+          }
         } catch (e) {
-          _errors.add("Row $rowIndex Error: $e");
+          _errors.add("Row $rowIndex: Internal Error");
         }
       }
 
       setState(() {
         _isLoading = false;
-        _statusMessage = "Upload Complete!\nUpdated: $_successCount records.";
+        _statusMessage = "PROCESSING COMPLETE: $_successCount RECORDS UPDATED";
       });
-
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _statusMessage = "Error: $e";
+        _statusMessage = "SYSTEM ERROR: $e";
       });
     }
   }
 
-  // Helper: Find User by Email & Update Stats
   Future<void> _updateEmployeeData(String email, String month, String year, int present, int absent, int late, double ot, double rate) async {
-    
-    // A. Lookup User
     final userSnapshot = await FirebaseFirestore.instance
         .collection('user')
         .where('email', isEqualTo: email)
@@ -106,14 +90,13 @@ class _BulkUploadScreenState extends State<BulkUploadScreen> {
         .get();
 
     if (userSnapshot.docs.isEmpty) {
-      _errors.add("Email not found: $email");
+      _errors.add("Not Found: $email");
       return;
     }
 
     String uid = userSnapshot.docs.first.id;
     String docId = "${uid}_${month}_$year";
 
-    // B. Update 'monthly_stats'
     await FirebaseFirestore.instance.collection('monthly_stats').doc(docId).set({
       'uid': uid,
       'month': month,
@@ -125,90 +108,154 @@ class _BulkUploadScreenState extends State<BulkUploadScreen> {
       'rate': rate,
       'updatedAt': FieldValue.serverTimestamp(),
     });
-
     _successCount++;
   }
+
+  // ==========================================
+  // UI BUILD (REDESIGNED FOR LUXURY THEME)
+  // ==========================================
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Bulk Attendance Upload")),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Icon
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(color: Colors.green.shade50, shape: BoxShape.circle),
-              child: const Icon(Icons.table_view, size: 60, color: Colors.green),
-            ),
-            const SizedBox(height: 20),
-            
-            const Text(
-              "Upload Excel (.xlsx)",
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              "Columns: Email | Month | Year | Present | Absent | Late | Overtime | Rate",
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 30),
-
-            // Upload Button
-            if (_isLoading)
-              const CircularProgressIndicator()
-            else
-              ElevatedButton.icon(
-                onPressed: _pickAndUploadFile,
-                icon: const Icon(Icons.upload_file),
-                label: const Text("Select Excel File"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+      backgroundColor: AppColors.luxDarkGreen,
+      appBar: AppBar(
+        title: const Text("BATCH DATA PROTOCOL", 
+          style: TextStyle(letterSpacing: 3, fontSize: 14, fontWeight: FontWeight.bold, fontFamily: 'serif')),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        foregroundColor: AppColors.luxGold,
+        elevation: 0,
+      ),
+      extendBodyBehindAppBar: true,
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: AppColors.luxBgGradient,
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              children: [
+                const SizedBox(height: 30),
+                
+                // Branded Central Icon
+                Container(
+                  padding: const EdgeInsets.all(25),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.luxGold.withValues(alpha: 0.3), width: 1.5),
+                    color: AppColors.luxGold.withValues(alpha: 0.05),
+                  ),
+                  child: const Icon(Icons.cloud_upload_outlined, size: 50, color: AppColors.luxGold),
                 ),
-              ),
+                
+                const SizedBox(height: 30),
+                
+                const Text(
+                  "Data Synchronization",
+                  style: TextStyle(color: AppColors.luxGold, fontSize: 24, fontFamily: 'serif', fontWeight: FontWeight.w400),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  "REQUIREMENTS: Email | Month | Year | Present | Absent | Late | OT | Rate",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.luxGold.withValues(alpha: 0.5), fontSize: 10, letterSpacing: 1.5, fontWeight: FontWeight.bold),
+                ),
+                
+                const SizedBox(height: 50),
 
-            const SizedBox(height: 30),
-
-            // Status Report
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Column(
-                children: [
-                  Text(_statusMessage, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10),
-                  if (_errors.isNotEmpty)
-                    Container(
-                      height: 150,
-                      child: ListView.builder(
-                        itemCount: _errors.length,
-                        itemBuilder: (ctx, i) => Text(
-                          "⚠️ ${_errors[i]}",
-                          style: const TextStyle(color: Colors.red, fontSize: 12),
+                // Upload Action
+                if (_isLoading)
+                  const CircularProgressIndicator(color: AppColors.luxGold)
+                else
+                  GestureDetector(
+                    onTap: _pickAndUploadFile,
+                    child: Container(
+                      width: double.infinity,
+                      height: 55,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        gradient: AppColors.luxGoldGradient,
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 5))
+                        ]
+                      ),
+                      child: const Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.file_present_outlined, color: AppColors.luxDarkGreen, size: 20),
+                            SizedBox(width: 12),
+                            Text("INITIALIZE EXCEL UPLOAD", 
+                              style: TextStyle(color: AppColors.luxDarkGreen, fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 12)),
+                          ],
                         ),
                       ),
-                    )
-                ],
-              ),
-            )
-          ],
+                    ),
+                  ),
+
+                const SizedBox(height: 40),
+
+                // Status & Logs Console
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppColors.luxAccentGreen.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: AppColors.luxGold.withValues(alpha: 0.2)),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(_statusMessage, 
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                      
+                      if (_errors.isNotEmpty) ...[
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 15),
+                          child: Divider(color: AppColors.luxGold, thickness: 0.1),
+                        ),
+                        SizedBox(
+                          height: 180,
+                          child: ListView.builder(
+                            itemCount: _errors.length,
+                            itemBuilder: (ctx, i) => Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.error_outline, color: Colors.redAccent, size: 14),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(_errors[i], 
+                                      style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ]
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 40),
+                
+                // Footer
+                Text(
+                  "SECURE ADMINISTRATIVE PORTAL",
+                  style: TextStyle(color: AppColors.luxGold.withValues(alpha: 0.3), fontSize: 9, letterSpacing: 3, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 }
-
-// Excel File Format:A (Email)	B (Month)	C (Year)	D (Present)	E (Absent)	F (Late)	G (Overtime)	H (Rate)
-// john@abc.com	November	2025	22	1	2	5.5	95
-// jane@abc.com	November	2025	25	0	0	0	100

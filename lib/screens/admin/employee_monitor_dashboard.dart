@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:employee_system/config/constants/app_colors.dart'; // Adjust path
 
 class EmployeeMonitorDashboard extends StatefulWidget {
   final String employeeId;
@@ -29,36 +30,44 @@ class _EmployeeMonitorDashboardState extends State<EmployeeMonitorDashboard> wit
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.luxDarkGreen,
       appBar: AppBar(
-        title: Text("Tracking: ${widget.employeeName}"),
+        title: Text(widget.employeeName.toUpperCase(), 
+          style: const TextStyle(letterSpacing: 2, fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'serif')),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        foregroundColor: AppColors.luxGold,
+        elevation: 0,
         bottom: TabBar(
           controller: _tabController,
+          indicatorColor: AppColors.luxGold,
+          labelColor: AppColors.luxGold,
+          unselectedLabelColor: AppColors.luxGold.withValues(alpha: 0.4),
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1),
           tabs: const [
-            Tab(text: "Live Map", icon: Icon(Icons.location_on)),
-            Tab(text: "Contacts", icon: Icon(Icons.contacts)),
-            Tab(text: "Gallery", icon: Icon(Icons.image)),
+            Tab(text: "LIVE RADAR", icon: Icon(Icons.satellite_alt_outlined)),
+            Tab(text: "INTEL / CONTACTS", icon: Icon(Icons.folder_shared_outlined)),
+            Tab(text: "VISUAL LOGS", icon: Icon(Icons.photo_library_outlined)),
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          // TAB 1: MAP
-          _LiveMapTab(employeeId: widget.employeeId),
-          
-          // TAB 2: CONTACTS (Synced from Employee)
-          _ContactsTab(employeeId: widget.employeeId),
-          
-          // TAB 3: IMAGES (Uploaded by Employee)
-          _ImagesTab(employeeId: widget.employeeId),
-        ],
+      body: Container(
+        decoration: const BoxDecoration(gradient: AppColors.luxBgGradient),
+        child: TabBarView(
+          controller: _tabController,
+          children: [
+            _LiveMapTab(employeeId: widget.employeeId),
+            _ContactsTab(employeeId: widget.employeeId),
+            _ImagesTab(employeeId: widget.employeeId),
+          ],
+        ),
       ),
     );
   }
 }
 
 // ===================================================
-// 1. LIVE MAP TAB (OPTIMIZED FOR ADMIN UX)
+// 1. LIVE MAP TAB (LUXURY REDESIGN)
 // ===================================================
 class _LiveMapTab extends StatefulWidget {
   final String employeeId;
@@ -71,23 +80,14 @@ class _LiveMapTab extends StatefulWidget {
 class _LiveMapTabState extends State<_LiveMapTab> {
   GoogleMapController? _mapController;
   bool _isFirstLoad = true;
-
   DateTime? _selectedDate;
   List<LatLng> _historyPoints = [];
 
-  // ─────────────────────────────────────────────
-  // OPEN GOOGLE MAPS NAVIGATION
-  // ─────────────────────────────────────────────
   Future<void> _openGoogleMaps(double lat, double lng) async {
     final uri = Uri.parse("google.navigation:q=$lat,$lng&mode=d");
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
+    if (await canLaunchUrl(uri)) await launchUrl(uri);
   }
 
-  // ─────────────────────────────────────────────
-  // PICK DATE (LAST 45 DAYS ONLY)
-  // ─────────────────────────────────────────────
   Future<void> _pickDate() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
@@ -95,214 +95,114 @@ class _LiveMapTabState extends State<_LiveMapTab> {
       initialDate: _selectedDate ?? now,
       firstDate: now.subtract(const Duration(days: 45)),
       lastDate: now,
+      builder: (context, child) => Theme(
+        data: ThemeData.dark().copyWith(
+          colorScheme: const ColorScheme.dark(primary: AppColors.luxGold, onPrimary: AppColors.luxDarkGreen, surface: AppColors.luxAccentGreen),
+        ),
+        child: child!,
+      ),
     );
 
     if (picked != null) {
-      setState(() {
-        _selectedDate = picked;
-        _historyPoints.clear();
-      });
+      setState(() => _selectedDate = picked);
       await _loadHistoryForDay(picked);
     }
   }
 
-  // ─────────────────────────────────────────────
-  // LOAD HISTORY FOR SELECTED DAY ONLY
-  // ─────────────────────────────────────────────
   Future<void> _loadHistoryForDay(DateTime day) async {
     final start = DateTime(day.year, day.month, day.day);
-    final end = start.add(const Duration(days: 1));
-
     final snapshot = await FirebaseFirestore.instance
-        .collection('user')
-        .doc(widget.employeeId)
-        .collection('location_history')
+        .collection('user').doc(widget.employeeId).collection('location_history')
         .where('timestamp', isGreaterThanOrEqualTo: start)
-        .where('timestamp', isLessThan: end)
-        .orderBy('timestamp')
-        .get();
+        .where('timestamp', isLessThan: start.add(const Duration(days: 1)))
+        .orderBy('timestamp').get();
 
-    final points = snapshot.docs.map((doc) {
-      final data = doc.data();
-      return LatLng(
-        (data['lat'] as num).toDouble(),
-        (data['lng'] as num).toDouble(),
-      );
-    }).toList();
-
-    if (mounted) {
-      setState(() => _historyPoints = points);
-    }
+    final points = snapshot.docs.map((doc) => LatLng((doc['lat'] as num).toDouble(), (doc['lng'] as num).toDouble())).toList();
+    if (mounted) setState(() => _historyPoints = points);
   }
 
-  // ─────────────────────────────────────────────
-  // BUILD
-  // ─────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('user')
-          .doc(widget.employeeId)
-          .snapshots(),
+      stream: FirebaseFirestore.instance.collection('user').doc(widget.employeeId).snapshots(),
       builder: (context, liveSnapshot) {
-        if (!liveSnapshot.hasData || !liveSnapshot.data!.exists) {
-          return const Center(child: CircularProgressIndicator());
-        }
+        if (!liveSnapshot.hasData || !liveSnapshot.data!.exists) return const Center(child: CircularProgressIndicator(color: AppColors.luxGold));
 
         final data = liveSnapshot.data!.data() as Map<String, dynamic>;
+        if (!data.containsKey('current_lat')) return const Center(child: Text("OFFLINE", style: TextStyle(color: AppColors.luxGold, letterSpacing: 2)));
 
-        if (!data.containsKey('current_lat') ||
-            !data.containsKey('current_lng')) {
-          return const Center(child: Text("Tracking not started"));
-        }
-
-        final LatLng livePos = LatLng(
-          (data['current_lat'] as num).toDouble(),
-          (data['current_lng'] as num).toDouble(),
-        );
-
-        // ───────── ONLINE STATUS ─────────
+        final LatLng livePos = LatLng((data['current_lat'] as num).toDouble(), (data['current_lng'] as num).toDouble());
         Timestamp? ts = data['last_seen'];
-        bool isOnline = false;
-        String statusText = "Offline";
-        Color statusColor = Colors.red;
-
-        if (ts != null) {
-          final diff = DateTime.now().difference(ts.toDate()).inMinutes;
-          if (diff < 5) {
-            isOnline = true;
-            statusText = "🟢 Live Now";
-            statusColor = Colors.green;
-          } else {
-            statusText = "🔴 Last seen $diff min ago";
-          }
-        }
-
-        if (_isFirstLoad && _mapController != null) {
-          _mapController!.animateCamera(
-            CameraUpdate.newLatLngZoom(livePos, 15),
-          );
-          _isFirstLoad = false;
-        }
+        bool isOnline = ts != null && DateTime.now().difference(ts.toDate()).inMinutes < 5;
 
         return Stack(
           children: [
-            // ───────── GOOGLE MAP ─────────
             GoogleMap(
-              initialCameraPosition:
-                  CameraPosition(target: livePos, zoom: 15),
+              initialCameraPosition: CameraPosition(target: livePos, zoom: 15),
               onMapCreated: (controller) => _mapController = controller,
-
-              // HISTORY ROUTE (ONE DAY ONLY)
-              polylines: _historyPoints.length > 1
-                  ? {
-                      Polyline(
-                        polylineId: const PolylineId("history"),
-                        points: _historyPoints,
-                        color: Colors.blueAccent,
-                        width: 5,
-                      ),
-                    }
-                  : {},
-
-              // LIVE MARKER
-              markers: {
-                Marker(
-                  markerId: const MarkerId("live"),
-                  position: livePos,
-                  icon: BitmapDescriptor.defaultMarkerWithHue(
-                    isOnline
-                        ? BitmapDescriptor.hueGreen
-                        : BitmapDescriptor.hueRed,
-                  ),
-                  infoWindow: InfoWindow(
-                    title: "Employee",
-                    snippet: statusText,
-                  ),
-                ),
-              },
+              polylines: _historyPoints.isNotEmpty ? {Polyline(polylineId: const PolylineId("path"), points: _historyPoints, color: AppColors.luxGold, width: 4)} : {},
+              markers: {Marker(markerId: const MarkerId("live"), position: livePos, icon: BitmapDescriptor.defaultMarkerWithHue(isOnline ? 120 : 0))},
             ),
 
-            // ───────── STATUS PILL ─────────
+            // LUXURY STATUS PILL
             Positioned(
-              top: 20,
-              left: 20,
-              right: 20,
+              top: 20, left: 20, right: 20,
               child: Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColors.luxDarkGreen.withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(30),
-                  boxShadow: const [
-                    BoxShadow(color: Colors.black12, blurRadius: 10),
-                  ],
+                  border: Border.all(color: AppColors.luxGold.withValues(alpha: 0.4)),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.circle, color: statusColor, size: 12),
-                    const SizedBox(width: 10),
-                    Text(
-                      statusText,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: statusColor,
-                      ),
-                    ),
+                    Container(width: 8, height: 8, decoration: BoxDecoration(shape: BoxShape.circle, color: isOnline ? Colors.greenAccent : Colors.redAccent)),
+                    const SizedBox(width: 12),
+                    Text(isOnline ? "ENCRYPTED SIGNAL: LIVE" : "SIGNAL LOST: LAST KNOWN", 
+                      style: const TextStyle(color: AppColors.luxGold, fontSize: 11, letterSpacing: 1.5, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
             ),
 
-            // ───────── DATE PICKER BUTTON ─────────
+            // DATE PICKER
             Positioned(
-              top: 80,
-              right: 20,
-              child: FloatingActionButton(
-                heroTag: "date",
-                backgroundColor: Colors.white,
-                child: const Icon(Icons.calendar_month, color: Colors.blue),
-                onPressed: _pickDate,
+              top: 80, right: 20,
+              child: GestureDetector(
+                onTap: _pickDate,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: AppColors.luxAccentGreen, shape: BoxShape.circle, border: Border.all(color: AppColors.luxGold.withValues(alpha: 0.5))),
+                  child: const Icon(Icons.history_toggle_off, color: AppColors.luxGold, size: 22),
+                ),
               ),
             ),
 
-            // ───────── CONTROLS ─────────
+            // NAVIGATION BUTTON (GOLD GRADIENT)
             Positioned(
-              bottom: 30,
-              left: 20,
-              right: 20,
-              child: Row(
-                children: [
-                  FloatingActionButton(
-                    heroTag: "center",
-                    backgroundColor: Colors.white,
-                    child:
-                        const Icon(Icons.my_location, color: Colors.blue),
-                    onPressed: () {
-                      _mapController?.animateCamera(
-                        CameraUpdate.newLatLngZoom(livePos, 16),
-                      );
-                    },
+              bottom: 30, left: 25, right: 25,
+              child: GestureDetector(
+                onTap: () => _openGoogleMaps(livePos.latitude, livePos.longitude),
+                child: Container(
+                  height: 55,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    gradient: AppColors.luxGoldGradient,
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 10)],
                   ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () =>
-                          _openGoogleMaps(livePos.latitude, livePos.longitude),
-                      icon: const Icon(Icons.directions),
-                      label: const Text("NAVIGATE"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue[900],
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.all(15),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                      ),
+                  child: const Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.directions_outlined, color: AppColors.luxDarkGreen),
+                        SizedBox(width: 12),
+                        Text("INITIATE NAVIGATION", style: TextStyle(color: AppColors.luxDarkGreen, fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 13)),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
             ),
           ],
@@ -312,9 +212,8 @@ class _LiveMapTabState extends State<_LiveMapTab> {
   }
 }
 
-
 // ===================================================
-// 2. CONTACTS TAB (Synced Data)
+// 2. CONTACTS TAB (LUXURY REDESIGN)
 // ===================================================
 class _ContactsTab extends StatelessWidget {
   final String employeeId;
@@ -323,149 +222,35 @@ class _ContactsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('user')
-          .doc(employeeId)
-          .collection('synced_contacts')
-          .orderBy('displayName')
-          .snapshots(),
+      stream: FirebaseFirestore.instance.collection('user').doc(employeeId).collection('synced_contacts').orderBy('displayName').snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(
-            child: Text(
-              "No contacts synced",
-              style: TextStyle(color: Colors.grey),
-            ),
-          );
-        }
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: AppColors.luxGold));
 
         return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
           itemCount: snapshot.data!.docs.length,
           itemBuilder: (context, index) {
-            final data =
-                snapshot.data!.docs[index].data() as Map<String, dynamic>;
-
+            final data = snapshot.data!.docs[index].data() as Map<String, dynamic>;
             final String name = data['displayName'] ?? 'Unknown';
             final List phones = data['phones'] ?? [];
-            final List emails = data['emails'] ?? [];
 
             return Container(
-              margin: const EdgeInsets.only(bottom: 14),
+              margin: const EdgeInsets.only(bottom: 15),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 12,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
+                color: AppColors.luxAccentGreen.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: AppColors.luxGold.withValues(alpha: 0.2)),
               ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ───── HEADER ─────
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 22,
-                          backgroundColor: const Color(0xFFEEF2FF),
-                          child: Text(
-                            name.isNotEmpty
-                                ? name[0].toUpperCase()
-                                : "?",
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF5E4B8B),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            name,
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    // ───── PHONES ─────
-                    if (phones.isNotEmpty) ...[
-                      const SizedBox(height: 14),
-                      const Divider(height: 1),
-                      const SizedBox(height: 10),
-                      ...phones.map((p) {
-                        final phone = p.toString();
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.phone,
-                                size: 18,
-                                color: Colors.green,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  phone,
-                                  style: const TextStyle(fontSize: 14),
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.call,
-                                  color: Colors.green,
-                                ),
-                                onPressed: () =>
-                                    launchUrl(Uri.parse("tel:$phone")),
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
-                    ],
-
-                    // ───── EMAILS ─────
-                    if (emails.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      ...emails.map((e) {
-                        final email = e.toString();
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.email_outlined,
-                                size: 18,
-                                color: Colors.blue,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  email,
-                                  style: const TextStyle(fontSize: 14),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
-                    ],
-                  ],
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: AppColors.luxGold.withValues(alpha: 0.1),
+                  child: Text(name.isNotEmpty ? name[0] : "?", style: const TextStyle(color: AppColors.luxGold, fontWeight: FontWeight.bold)),
+                ),
+                title: Text(name.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, fontFamily: 'serif')),
+                subtitle: phones.isNotEmpty ? Text(phones.first.toString(), style: TextStyle(color: AppColors.luxGold.withValues(alpha: 0.6), fontSize: 12)) : null,
+                trailing: IconButton(
+                  icon: const Icon(Icons.phone_outlined, color: AppColors.luxGold, size: 20),
+                  onPressed: () => phones.isNotEmpty ? launchUrl(Uri.parse("tel:${phones.first}")) : null,
                 ),
               ),
             );
@@ -477,7 +262,7 @@ class _ContactsTab extends StatelessWidget {
 }
 
 // ===================================================
-// 3. IMAGES TAB (Uploaded Data)
+// 3. IMAGES TAB (LUXURY REDESIGN)
 // ===================================================
 class _ImagesTab extends StatelessWidget {
   final String employeeId;
@@ -486,36 +271,21 @@ class _ImagesTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('uploads') // Assuming a collection for uploads
-          .where('uid', isEqualTo: employeeId)
-          .snapshots(),
+      stream: FirebaseFirestore.instance.collection('uploads').where('uid', isEqualTo: employeeId).snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        if (snapshot.data!.docs.isEmpty) return const Center(child: Text("No images uploaded."));
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: AppColors.luxGold));
 
         return GridView.builder(
-          padding: const EdgeInsets.all(10),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-          ),
+          padding: const EdgeInsets.all(20),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 12, mainAxisSpacing: 12),
           itemCount: snapshot.data!.docs.length,
           itemBuilder: (context, index) {
             var data = snapshot.data!.docs[index];
-            return GestureDetector(
-              onTap: () {
-                // Show full screen image logic here
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  image: DecorationImage(
-                    image: NetworkImage(data['url']),
-                    fit: BoxFit.cover,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                ),
+            return Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.luxGold.withValues(alpha: 0.3)),
+                image: DecorationImage(image: NetworkImage(data['url']), fit: BoxFit.cover),
               ),
             );
           },

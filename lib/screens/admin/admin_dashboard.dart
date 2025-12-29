@@ -4,8 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-
-// Import your screens
+// Import your screens (ensure these paths are correct)
 import 'manage_emergency_screen.dart' show ManageEmergencyScreen;
 import 'manage_employees.dart';
 import 'notifications_screen.dart';
@@ -14,6 +13,13 @@ import 'reports.dart';
 import 'settings.dart';
 import 'generate_salary_screen.dart';
 import 'manage_holidays_screen.dart';
+
+// Luxury Theme Constants
+const Color luxDarkGreen = Color(0xFF13211C);
+const Color luxAccentGreen = Color(0xFF1D322C);
+const Color luxGold = Color(0xFFC5A367);
+const Color luxLightGold = Color(0xFFF1D18A);
+
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({Key? key}) : super(key: key);
 
@@ -22,33 +28,24 @@ class AdminDashboard extends StatefulWidget {
 }
 
 class _AdminDashboardState extends State<AdminDashboard> {
-  // 1. Define the GlobalKey
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  
   int _selectedIndex = 0;
   final User? currentUser = FirebaseAuth.instance.currentUser;
 
-  // Define Titles & Icons for the Drawer
   final List<Map<String, dynamic>> _menuItems = [
-    {'title': 'Dashboard', 'icon': Icons.dashboard_rounded},
-    {'title': 'Employees', 'icon': Icons.people_alt_rounded},
-    {'title': 'Notifications', 'icon': Icons.notifications_active_rounded},
-    // {'title': 'Attendance', 'icon': Icons.access_time_filled_rounded},
-    {'title': 'Generate Attendance', 'icon': Icons.attach_money_rounded},
-    {'title': 'Monitoring', 'icon': Icons.monitor_rounded},
-    {'title': 'Reports', 'icon': Icons.bar_chart_rounded},
-    {'title': 'Manage Holidays', 'icon': Icons.calendar_month_outlined},
-    {'title': 'Emergency Contacts', 'icon': Icons.phone_in_talk_rounded},
-    {'title': 'Settings', 'icon': Icons.settings_rounded},
+    {'title': 'Dashboard', 'icon': Icons.dashboard_outlined},
+    {'title': 'Employees', 'icon': Icons.people_outline_rounded},
+    {'title': 'Notifications', 'icon': Icons.campaign_outlined},
+    {'title': 'Gen Attendance', 'icon': Icons.payments_outlined},
+    {'title': 'Monitoring', 'icon': Icons.monitor_heart_outlined},
+    {'title': 'Reports', 'icon': Icons.analytics_outlined},
+    {'title': 'Manage Holidays', 'icon': Icons.calendar_today_outlined},
+    {'title': 'Crisis Protocol', 'icon': Icons.shield_outlined},
+    {'title': 'Settings', 'icon': Icons.settings_outlined},
   ];
 
-  // 2. FIXED Function to Switch Tabs
   void _onItemSelected(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-
-    // Use the key to safely close the drawer ONLY if it is open
+    setState(() => _selectedIndex = index);
     if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
       _scaffoldKey.currentState?.closeDrawer();
     }
@@ -58,34 +55,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
     bool confirm = await showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Logout"),
-        content: const Text("Are you sure you want to logout?"),
+        backgroundColor: luxDarkGreen,
+        shape: RoundedRectangleBorder(side: const BorderSide(color: luxGold, width: 0.5), borderRadius: BorderRadius.circular(15)),
+        title: const Text("TERMINATE SESSION", style: TextStyle(color: luxGold, letterSpacing: 2, fontSize: 16, fontFamily: 'serif')),
+        content: const Text("Are you sure you want to exit the admin portal?", style: TextStyle(color: Colors.white70)),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("Logout", style: TextStyle(color: Colors.red)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("CANCEL", style: TextStyle(color: luxGold))),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("LOGOUT", style: TextStyle(color: Colors.redAccent))),
         ],
       ),
     ) ?? false;
 
     if (confirm) {
-      try {
-        await FirebaseAuth.instance.signOut();
-        if (!mounted) return;
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-          (route) => false,
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: $e")),
-        );
-      }
+      await FirebaseAuth.instance.signOut();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (route) => false);
     }
   }
 
@@ -95,7 +79,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       DashboardHome(onSwitchTab: _onItemSelected),
       const ManageEmployeesScreen(),
       const NotificationsScreen(),
-      // const AttendanceScreen(),
       const GenerateSalaryScreen(),
       const EmployeeListMonitor(),
       const ReportsScreen(),
@@ -105,168 +88,137 @@ class _AdminDashboardState extends State<AdminDashboard> {
     ];
 
     return Scaffold(
-      // 3. Assign the Key here
-      key: _scaffoldKey, 
+      key: _scaffoldKey,
+      backgroundColor: luxDarkGreen,
       appBar: AppBar(
-        title: Text(_menuItems[_selectedIndex]['title']),
+        title: Text(_menuItems[_selectedIndex]['title'].toUpperCase(), 
+          style: const TextStyle(letterSpacing: 3, fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'serif')),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: Colors.blue[900],
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
+        foregroundColor: luxGold,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _logout,
-            tooltip: "Logout",
-          ),
+          IconButton(icon: const Icon(Icons.power_settings_new_rounded), onPressed: _logout),
         ],
       ),
-      drawer: Drawer(
-        child: Column(
-          children: [
-            UserAccountsDrawerHeader(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.blue[900]!, Colors.blue[600]!],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              accountName: const Text(
-                "Admin Portal",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-              accountEmail: Text(currentUser?.email ?? "admin@company.com"),
-              currentAccountPicture: const CircleAvatar(
-                backgroundColor: Colors.white,
-                child: Icon(Icons.admin_panel_settings, size: 40, color: Colors.blue),
-              ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                padding: EdgeInsets.zero,
-                itemCount: _menuItems.length,
-                itemBuilder: (context, index) {
-                  final bool isSelected = _selectedIndex == index;
-                  return Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isSelected ? Colors.blue.withValues(alpha: 0.1) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: ListTile(
-                      leading: Icon(
-                        _menuItems[index]['icon'],
-                        color: isSelected ? Colors.blue[800] : Colors.grey[600],
-                      ),
-                      title: Text(
-                        _menuItems[index]['title'],
-                        style: TextStyle(
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          color: isSelected ? Colors.blue[800] : Colors.black87,
-                        ),
-                      ),
-                      onTap: () => _onItemSelected(index),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text("Version 1.0.0", style: TextStyle(color: Colors.grey)),
-            ),
-          ],
-        ),
-      ),
+      drawer: _buildLuxuryDrawer(),
       body: Container(
-        color: Colors.grey[50],
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(center: Alignment.center, radius: 1.5, colors: [luxAccentGreen, luxDarkGreen]),
+        ),
         child: pages[_selectedIndex],
+      ),
+    );
+  }
+
+  Widget _buildLuxuryDrawer() {
+    return Drawer(
+      backgroundColor: luxDarkGreen,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.only(top: 60, bottom: 30),
+            width: double.infinity,
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: luxGold.withValues(alpha: 0.2)))),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: luxGold, width: 1)),
+                  child: const CircleAvatar(
+                    radius: 35,
+                    backgroundColor: luxAccentGreen,
+                    child: Icon(Icons.admin_panel_settings_outlined, size: 40, color: luxGold),
+                  ),
+                ),
+                const SizedBox(height: 15),
+                const Text("ADMIN PORTAL", style: TextStyle(color: luxGold, fontSize: 18, letterSpacing: 4, fontFamily: 'serif')),
+                Text(currentUser?.email ?? "admin@osc.com", style: TextStyle(color: luxGold.withValues(alpha: 0.5), fontSize: 11)),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              itemCount: _menuItems.length,
+              itemBuilder: (context, index) {
+                final bool isSelected = _selectedIndex == index;
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 25),
+                  leading: Icon(_menuItems[index]['icon'], color: isSelected ? luxGold : luxGold.withValues(alpha: 0.4)),
+                  title: Text(_menuItems[index]['title'].toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 12,
+                        letterSpacing: 1.5,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected ? luxGold : luxGold.withValues(alpha: 0.6),
+                      )),
+                  selected: isSelected,
+                  selectedTileColor: luxGold.withValues(alpha: 0.05),
+                  onTap: () => _onItemSelected(index),
+                );
+              },
+            ),
+          ),
+          const Divider(color: luxGold, thickness: 0.1),
+          const Padding(padding: EdgeInsets.all(16.0), child: Text("OSC EXECUTIVE v1.0", style: TextStyle(color: luxGold, fontSize: 10, letterSpacing: 2))),
+        ],
       ),
     );
   }
 }
 
 // ==================================================
-//  DASHBOARD HOME 
+//  DASHBOARD HOME (REDESIGNED)
 // ==================================================
 
 class DashboardHome extends StatelessWidget {
   final Function(int) onSwitchTab;
-
   const DashboardHome({Key? key, required this.onSwitchTab}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Overview",
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
+          const Text("OVERVIEW", style: TextStyle(fontSize: 14, color: luxGold, letterSpacing: 3, fontWeight: FontWeight.bold, fontFamily: 'serif')),
+          const SizedBox(height: 20),
           
           GridView.count(
             crossAxisCount: 2,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
+            crossAxisSpacing: 15,
+            mainAxisSpacing: 15,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             children: [
               StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance.collection('user').where('role', isEqualTo: 'employee').snapshots(),
                 builder: (context, snapshot) {
-                  String count = "...";
-                  if (snapshot.hasData) {
-                    count = snapshot.data!.docs.length.toString();
-                  }
-                  return _buildStatCard("Total Staff", count, Icons.people, Colors.blue);
+                  return _buildStatCard("Total Staff", snapshot.hasData ? snapshot.data!.docs.length.toString() : "...", Icons.people_outline);
                 },
               ),
               StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance.collection('announcements').snapshots(),
                 builder: (context, snapshot) {
-                  String count = "...";
-                  if (snapshot.hasData) count = snapshot.data!.docs.length.toString();
-                  return _buildStatCard("Notices", count, Icons.campaign, Colors.orange);
+                  return _buildStatCard("Notices", snapshot.hasData ? snapshot.data!.docs.length.toString() : "...", Icons.campaign_outlined);
                 },
               ),
-              _buildStatCard("Present Today", "12", Icons.check_circle, Colors.green),
-              _buildStatCard("On Leave", "2", Icons.beach_access, Colors.redAccent),
+              _buildStatCard("Attendance", "94%", Icons.verified_outlined),
+              _buildStatCard("Pending", "03", Icons.hourglass_empty_outlined),
             ],
           ),
 
-          const SizedBox(height: 24),
-          const Text(
-            "Quick Actions",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 40),
+          const Text("QUICK ACTIONS", style: TextStyle(fontSize: 14, color: luxGold, letterSpacing: 3, fontWeight: FontWeight.bold, fontFamily: 'serif')),
+          const SizedBox(height: 15),
           
           Row(
             children: [
-              Expanded(
-                child: _buildActionButton(
-                  context, 
-                  "Post Notice", 
-                  Icons.send, 
-                  Colors.indigo,
-                  () => onSwitchTab(2), // Switch to Index 2
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _buildActionButton(
-                  context, 
-                  "Add Employee", 
-                  Icons.person_add, 
-                  Colors.teal,
-                  () => onSwitchTab(1), // Switch to Index 1
-                ),
-              ),
+              Expanded(child: _buildActionButton("Notice", Icons.send_outlined, () => onSwitchTab(2))),
+              const SizedBox(width: 15),
+              Expanded(child: _buildActionButton("Onboard User", Icons.person_add_outlined, () => onSwitchTab(1))),
             ],
           )
         ],
@@ -274,41 +226,44 @@ class DashboardHome extends StatelessWidget {
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(String title, String value, IconData icon) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 10, spreadRadius: 2),
-        ],
+        color: luxAccentGreen.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: luxGold.withValues(alpha: 0.2)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
-            child: Icon(icon, color: color, size: 30),
-          ),
+          Icon(icon, color: luxGold, size: 28),
           const SizedBox(height: 12),
-          Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-          Text(title, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+          Text(value, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'serif')),
+          const SizedBox(height: 4),
+          Text(title.toUpperCase(), style: TextStyle(color: luxGold.withValues(alpha: 0.5), fontSize: 10, letterSpacing: 1)),
         ],
       ),
     );
   }
 
-  Widget _buildActionButton(BuildContext context, String label, IconData icon, Color color, VoidCallback onTap) {
-    return ElevatedButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, color: Colors.white),
-      label: Text(label),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  Widget _buildActionButton(String label, IconData icon, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: const LinearGradient(colors: [luxLightGold, luxGold], begin: Alignment.topCenter, end: Alignment.bottomCenter),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: luxDarkGreen, size: 18),
+            const SizedBox(width: 10),
+            Text(label.toUpperCase(), style: const TextStyle(color: luxDarkGreen, fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1)),
+          ],
+        ),
       ),
     );
   }

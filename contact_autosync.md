@@ -527,7 +527,7 @@ class \_EmployeeDashboardState extends State<EmployeeDashboard> {
 
 &nbsp;       elevation: 0,
 
-&nbsp;       indicatorColor: const Color(0xFFB5A0D9).withOpacity(0.3),
+&nbsp;       indicatorColor: const Color(0xFFB5A0D9).withValues(0.3),
 
 &nbsp;       destinations: const \[
 

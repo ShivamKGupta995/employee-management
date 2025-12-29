@@ -139,7 +139,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         // const SizedBox(height: 8),
                         // Text(
                         //   "Sign in to continue", 
-                        //   style: TextStyle(color: AppColors.withOpacity(AppColors.luxGold, 0.7), fontSize: 16)
+                        //   style: TextStyle(color: AppColors.withValues(AppColors.luxGold, 0.7), fontSize: 16)
                         // ),
                         // const SizedBox(height: 50),
 
@@ -164,7 +164,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             suffixIcon: IconButton(
                               icon: Icon(
                                 _isPasswordVisible ? Icons.visibility : Icons.visibility_off, 
-                                color: AppColors.withOpacity(AppColors.luxGold, 0.7), 
+                                color: AppColors.withValues(AppColors.luxGold, 0.7), 
                                 size: 22
                               ),
                               onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
@@ -235,7 +235,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: AppColors.luxGold, fontSize: 14),
-      prefixIcon: Icon(icon, color: AppColors.withOpacity(AppColors.luxGold, 0.8), size: 22),
+      prefixIcon: Icon(icon, color: AppColors.withValues(AppColors.luxGold, 0.8), size: 22),
       
       // ✅ ADDED THIS: Background fill makes typing text clearly visible
       filled: true,
@@ -244,7 +244,7 @@ class _LoginScreenState extends State<LoginScreen> {
       floatingLabelBehavior: FloatingLabelBehavior.always, 
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: AppColors.withOpacity(AppColors.luxGold, 0.6), width: 1.2),
+        borderSide: BorderSide(color: AppColors.withValues(AppColors.luxGold, 0.6), width: 1.2),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
