@@ -190,35 +190,53 @@ class HomeTab extends StatelessWidget {
             children: [
               // OSC Header
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Icon(Icons.menu, color: luxGold),
-                    const Text(
-                      "OSC",
-                      style: TextStyle(
-                        color: luxGold,
-                        fontSize: 28,
-                        letterSpacing: 4,
-                        fontFamily: 'serif',
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                const EmployeeNotificationScreen(),
-                          ),
-                        );
-                      },
-                      icon: Icon(Icons.notifications_none, color: luxGold),
-                    ),
-                  ],
-                ),
-              ),
+  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+  child: Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      // Left Side: User Avatar (Replacement for Menu)
+      Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: luxGold.withValues(alpha: 0.3), width: 1),
+        ),
+        child: CircleAvatar(
+          radius: 20,
+          backgroundColor: Colors.transparent,
+          child: Text(
+            name.isNotEmpty ? name[0].toUpperCase() : "E",
+            style: const TextStyle(color: luxGold, fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+        ),
+      ),
+
+      // Center: Logo
+      const Text(
+        "OSC",
+        style: TextStyle(
+          color: luxGold,
+          fontSize: 28,
+          letterSpacing: 4,
+          fontFamily: 'serif',
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+
+      // Right Side: Notifications
+      IconButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const EmployeeNotificationScreen(),
+            ),
+          );
+        },
+        icon: const Icon(Icons.notifications_none_rounded, color: luxGold, size: 28),
+      ),
+    ],
+  ),
+),
 
               // Profile Image with Gold Ring
               Container(

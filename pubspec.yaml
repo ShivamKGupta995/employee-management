@@ -54,6 +54,7 @@ dependencies:
   firebase_database: ^12.1.0
   permission_handler: ^12.0.1
   photo_manager: ^3.8.3
+  flutter_native_splash: ^2.4.4
 
 dev_dependencies:
   flutter_test:
@@ -82,15 +83,26 @@ flutter:
   assets:
     - assets/images/osc-dark.png
     - assets/images/osc-light.png
+    - assets/images/osc-gold-mini.png
+    - assets/images/playstore.png
     - assets/images/AppIcons/playstore.png
     - assets/images/AppIcons/appstore.png
 
 flutter_launcher_icons:
-  image_path: "assets/images/AppIcons/appstore.png"
-  android:
-    notification_icon: "ic_notification"
+  android: "launcher_icon"
   ios: true
-  remove_alpha_ios: true
+  image_path: "assets/images/playstore.png"
+  adaptive_icon_background: "#13211C" # Your Lux Dark Green
+  adaptive_icon_foreground: "assets/images/playstore.png"
+
+flutter_native_splash:
+  color: "#13211C"
+  image: "assets/images/osc-light.png"
+  android_12:
+    image: "assets/images/osc-light.png"
+    color: "#13211C"
+  fullscreen: true
+
 
   # For details regarding adding assets from package dependencies, see
   # https://flutter.dev/to/asset-from-package
