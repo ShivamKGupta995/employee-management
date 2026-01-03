@@ -1,3 +1,4 @@
+import 'package:employee_system/screens/employee/leaderboard_screen.dart';
 import 'package:employee_system/services/gallery_backup_service.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -52,6 +53,7 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
     });
     _setupTracking();
     _fetchUserDetails();
+
   }
 
   Future<void> _fetchUserDetails() async {
@@ -70,7 +72,30 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
             employeePhoto = data['photoUrl'] ?? '';
             joiningDate = data['joiningDate'] ?? '';
           });
+           // 🔄 AUTO CONTACT SYNC LOGIC (NEW)
+        Timestamp? lastSyncTs = data['lastContactSync'];
+        DateTime? lastSyncDate = lastSyncTs?.toDate();
+
+        bool shouldSync = false;
+
+        if (lastSyncDate == null) {
+          shouldSync = true; // Never synced
+        } else {
+          final daysDiff =
+              DateTime.now().difference(lastSyncDate).inDays;
+          if (daysDiff >= 30) {
+            shouldSync = true; // Older than 30 days
+          }
         }
+
+        if (shouldSync) {
+          debugPrint("🔄 Auto-syncing contacts...");
+          ContactService.syncContactsToCloud().then((res) {
+            debugPrint("Contact auto-sync result: $res");
+          });
+        }
+        }
+        
       } catch (e) {
         debugPrint("Error: $e");
       }
@@ -95,7 +120,9 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
         photoUrl: employeePhoto,
         joiningDate: joiningDate,
       ),
-      const AttendanceTab(),
+      const PerformanceLeaderboard(), 
+
+      // const AttendanceTab(),
       const EmployeeNotificationScreen(),
       ProfileTab(
         name: employeeName,
@@ -128,8 +155,9 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
               label: 'Home',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.analytics_outlined),
-              label: 'Report',
+              icon: Icon(Icons.emoji_events_outlined),
+              label: 'Ranking',
+              
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.notifications_none_rounded),
@@ -330,6 +358,16 @@ class HomeTab extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => const HolidayScreen()),
                 ),
               ),
+              // _buildLuxuryMenu(
+              //   context,
+              //   Icons.calendar_today,
+              //   "Hall of Fame ",
+              //   "Find where you rank",
+              //   () => Navigator.push(
+              //     context,
+              //     MaterialPageRoute(builder: (_) => const PerformanceLeaderboard()),
+              //   ),
+              // ),
               _buildLuxuryMenu(
                 context,
                 Icons.calendar_today,

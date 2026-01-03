@@ -54,6 +54,8 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
         enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.luxGold.withValues(alpha: 0.3)), borderRadius: BorderRadius.circular(12)),
         focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: AppColors.luxGold, width: 1.5), borderRadius: BorderRadius.circular(12)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        filled: true,
+    fillColor: AppColors.luxAccentGreen.withValues(alpha: 0.2),
       );
 
   // ==========================================

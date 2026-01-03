@@ -1,4 +1,5 @@
 import 'package:employee_system/screens/admin/employee_list_monitor.dart';
+import 'package:employee_system/screens/admin/leaderboard_screen.dart';
 import 'package:employee_system/screens/login_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -35,13 +36,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
   final List<Map<String, dynamic>> _menuItems = [
     {'title': 'Dashboard', 'icon': Icons.dashboard_outlined},
     {'title': 'Employees', 'icon': Icons.people_outline_rounded},
+    {'title': 'Leader Board', 'icon': Icons.leaderboard_outlined},
     {'title': 'Notifications', 'icon': Icons.campaign_outlined},
     {'title': 'Gen Attendance', 'icon': Icons.payments_outlined},
     {'title': 'Monitoring', 'icon': Icons.monitor_heart_outlined},
-    {'title': 'Reports', 'icon': Icons.analytics_outlined},
+    // {'title': 'Reports', 'icon': Icons.analytics_outlined},
     {'title': 'Manage Holidays', 'icon': Icons.calendar_today_outlined},
     {'title': 'Crisis Protocol', 'icon': Icons.shield_outlined},
-    {'title': 'Settings', 'icon': Icons.settings_outlined},
+    // {'title': 'Settings', 'icon': Icons.settings_outlined},
   ];
 
   void _onItemSelected(int index) {
@@ -78,13 +80,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final List<Widget> pages = [
       DashboardHome(onSwitchTab: _onItemSelected),
       const ManageEmployeesScreen(),
+      const PerformanceLeaderboard(),
       const NotificationsScreen(),
       const GenerateSalaryScreen(),
       const EmployeeListMonitor(),
-      const ReportsScreen(),
+      // const ReportsScreen(),
       const ManageHolidaysScreen(),
       const ManageEmergencyScreen(),
-      const SettingsScreen(),
+      // const SettingsScreen(),
     ];
 
     return Scaffold(
@@ -216,7 +219,7 @@ class DashboardHome extends StatelessWidget {
           
           Row(
             children: [
-              Expanded(child: _buildActionButton("Notice", Icons.send_outlined, () => onSwitchTab(2))),
+              Expanded(child: _buildActionButton("Notice", Icons.send_outlined, () => onSwitchTab(3))),
               const SizedBox(width: 15),
               Expanded(child: _buildActionButton("Onboard User", Icons.person_add_outlined, () => onSwitchTab(1))),
             ],
@@ -267,4 +270,5 @@ class DashboardHome extends StatelessWidget {
       ),
     );
   }
+
 }

@@ -274,6 +274,8 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> with Single
     prefixIcon: Icon(icon, color: AppColors.luxGold, size: 18),
     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.luxGold.withValues(alpha: 0.2))),
     focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.luxGold)),
+    filled: true,
+    fillColor: AppColors.luxAccentGreen.withValues(alpha: 0.2),
   );
 
   Widget _luxTextField(TextEditingController ctrl, String label, IconData icon) => TextField(controller: ctrl, keyboardType: TextInputType.number, style: const TextStyle(color: Colors.white), decoration: _luxInput(label, icon));
