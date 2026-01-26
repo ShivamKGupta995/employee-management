@@ -15,11 +15,45 @@ class ManageEmployeesScreen extends StatefulWidget {
 }
 
 class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
-  final CollectionReference usersRef = FirebaseFirestore.instance.collection('user');
+  final CollectionReference usersRef = FirebaseFirestore.instance.collection(
+    'user',
+  );
   final Reference storageRef = FirebaseStorage.instance.ref();
 
   final List<String> roleList = ['admin', 'employee'];
-  final List<String> departmentList = ['HR', 'Finance', 'Engineering', 'Sales', 'Marketing', 'General'];
+  final List<String> departmentList = [
+    'HR',
+    'Finance',
+    'Engineering',
+    'Sales',
+    'Marketing',
+    'General',
+  ];
+  List<String> dynamicDepartments = ['General']; // Default value
+
+  @override
+  void initState() {
+    super.initState();
+    _listenToDepartments();
+  }
+
+  void _listenToDepartments() {
+    FirebaseFirestore.instance.collection('departments').snapshots().listen((
+      snapshot,
+    ) {
+      if (snapshot.docs.isNotEmpty) {
+        setState(() {
+          dynamicDepartments = snapshot.docs
+              .map((doc) => doc['name'] as String)
+              .toList();
+          // Ensure 'General' is always an option if you want
+          if (!dynamicDepartments.contains('General')) {
+            dynamicDepartments.add('General');
+          }
+        });
+      }
+    });
+  }
 
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
@@ -43,20 +77,33 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
   // ==========================================
 
   Widget sectionTitle(String text) => Padding(
-        padding: const EdgeInsets.only(top: 20, bottom: 10),
-        child: Text(text.toUpperCase(),
-            style: TextStyle(color: AppColors.luxGold.withValues(alpha: 0.7), letterSpacing: 2, fontSize: 11, fontWeight: FontWeight.bold)),
-      );
+    padding: const EdgeInsets.only(top: 20, bottom: 10),
+    child: Text(
+      text.toUpperCase(),
+      style: TextStyle(
+        color: AppColors.luxGold.withValues(alpha: 0.7),
+        letterSpacing: 2,
+        fontSize: 11,
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+  );
 
   InputDecoration _luxInput(String label) => InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: AppColors.luxGold.withValues(alpha: 0.6)),
-        enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.luxGold.withValues(alpha: 0.3)), borderRadius: BorderRadius.circular(12)),
-        focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: AppColors.luxGold, width: 1.5), borderRadius: BorderRadius.circular(12)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-        filled: true,
+    labelText: label,
+    labelStyle: TextStyle(color: AppColors.luxGold.withValues(alpha: 0.6)),
+    enabledBorder: OutlineInputBorder(
+      borderSide: BorderSide(color: AppColors.luxGold.withValues(alpha: 0.3)),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderSide: const BorderSide(color: AppColors.luxGold, width: 1.5),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+    filled: true,
     fillColor: AppColors.luxAccentGreen.withValues(alpha: 0.2),
-      );
+  );
 
   // ==========================================
   // LOGIC (ORIGINAL LOGIC PRESERVED)
@@ -69,18 +116,29 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
     }
   }
 
-  Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
+  Future<void> _selectDate(
+    BuildContext context,
+    TextEditingController controller,
+  ) async {
     DateTime? picked = await showDatePicker(
-        context: context,
-        initialDate: DateTime.now(),
-        firstDate: DateTime(1950),
-        lastDate: DateTime(2100),
-        builder: (context, child) => Theme(
-            data: ThemeData.dark().copyWith(
-                colorScheme: const ColorScheme.dark(primary: AppColors.luxGold, onPrimary: AppColors.luxDarkGreen, surface: AppColors.luxAccentGreen)),
-            child: child!));
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(1950),
+      lastDate: DateTime(2100),
+      builder: (context, child) => Theme(
+        data: ThemeData.dark().copyWith(
+          colorScheme: const ColorScheme.dark(
+            primary: AppColors.luxGold,
+            onPrimary: AppColors.luxDarkGreen,
+            surface: AppColors.luxAccentGreen,
+          ),
+        ),
+        child: child!,
+      ),
+    );
     if (picked != null) {
-      controller.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+      controller.text =
+          "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
     }
   }
 
@@ -128,9 +186,20 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           backgroundColor: AppColors.luxDarkGreen,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: AppColors.luxGold.withValues(alpha: 0.3))),
-          title: Text(employee == null ? 'NEW ONBOARDING' : 'EDIT CREDENTIALS',
-              textAlign: TextAlign.center, style: const TextStyle(color: AppColors.luxGold, letterSpacing: 2, fontSize: 16, fontFamily: 'serif')),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: AppColors.luxGold.withValues(alpha: 0.3)),
+          ),
+          title: Text(
+            employee == null ? 'NEW ONBOARDING' : 'EDIT CREDENTIALS',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.luxGold,
+              letterSpacing: 2,
+              fontSize: 16,
+              fontFamily: 'serif',
+            ),
+          ),
           content: SingleChildScrollView(
             child: Column(
               children: [
@@ -142,57 +211,97 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                     children: [
                       Container(
                         padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.luxGold, width: 1)),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.luxGold,
+                            width: 1,
+                          ),
+                        ),
                         child: CircleAvatar(
                           radius: 50,
                           backgroundColor: AppColors.luxAccentGreen,
                           backgroundImage: _selectedImage != null
                               ? FileImage(_selectedImage!)
-                              : (_currentImageUrl != null ? NetworkImage(_currentImageUrl!) : null) as ImageProvider?,
-                          child: (_selectedImage == null && _currentImageUrl == null) ? const Icon(Icons.person, size: 40, color: AppColors.luxGold) : null,
+                              : (_currentImageUrl != null
+                                        ? NetworkImage(_currentImageUrl!)
+                                        : null)
+                                    as ImageProvider?,
+                          child:
+                              (_selectedImage == null &&
+                                  _currentImageUrl == null)
+                              ? const Icon(
+                                  Icons.person,
+                                  size: 40,
+                                  color: AppColors.luxGold,
+                                )
+                              : null,
                         ),
                       ),
                       GestureDetector(
                         onTap: () => _pickImage(setDialogState),
-                        child: const CircleAvatar(radius: 16, backgroundColor: AppColors.luxGold, child: Icon(Icons.edit, size: 14, color: AppColors.luxDarkGreen)),
+                        child: const CircleAvatar(
+                          radius: 16,
+                          backgroundColor: AppColors.luxGold,
+                          child: Icon(
+                            Icons.edit,
+                            size: 14,
+                            color: AppColors.luxDarkGreen,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
 
                 sectionTitle('Identity'),
-                TextField(controller: nameController, style: const TextStyle(color: Colors.white), decoration: _luxInput('Full Name')),
+                TextField(
+                  controller: nameController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _luxInput('Full Name'),
+                ),
                 const SizedBox(height: 15),
                 TextField(
-                    controller: emailController,
-                    enabled: employee == null,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: _luxInput('Email Address')),
+                  controller: emailController,
+                  enabled: employee == null,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _luxInput('Email Address'),
+                ),
                 const SizedBox(height: 15),
-                TextField(controller: phoneController, style: const TextStyle(color: Colors.white), decoration: _luxInput('Contact Number')),
+                TextField(
+                  controller: phoneController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _luxInput('Contact Number'),
+                ),
 
                 sectionTitle('Schedules'),
                 TextField(
-                    controller: dobController,
-                    readOnly: true,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: _luxInput('Birth Date'),
-                    onTap: () => _selectDate(context, dobController)),
+                  controller: dobController,
+                  readOnly: true,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _luxInput('Birth Date'),
+                  onTap: () => _selectDate(context, dobController),
+                ),
                 const SizedBox(height: 15),
                 TextField(
-                    controller: joiningDateController,
-                    readOnly: true,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: _luxInput('Joining Date'),
-                    onTap: () => _selectDate(context, joiningDateController)),
+                  controller: joiningDateController,
+                  readOnly: true,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _luxInput('Joining Date'),
+                  onTap: () => _selectDate(context, joiningDateController),
+                ),
 
                 sectionTitle('Compliance'),
                 DropdownButtonFormField<String>(
-                  value: _selectedDept,
+                  value: dynamicDepartments.contains(_selectedDept)
+                      ? _selectedDept
+                      : dynamicDepartments.first, // Safety check
                   dropdownColor: AppColors.luxAccentGreen,
                   style: const TextStyle(color: Colors.white),
                   decoration: _luxInput('Department'),
-                  items: departmentList.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                  items: dynamicDepartments
+                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                      .toList(),
                   onChanged: (v) => setDialogState(() => _selectedDept = v!),
                 ),
                 const SizedBox(height: 15),
@@ -201,19 +310,27 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                   dropdownColor: AppColors.luxAccentGreen,
                   style: const TextStyle(color: Colors.white),
                   decoration: _luxInput('System Role'),
-                  items: roleList.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                  items: roleList
+                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                      .toList(),
                   onChanged: (v) => setDialogState(() => _selectedRole = v!),
                 ),
 
                 sectionTitle('Permissions'),
                 SwitchListTile(
-                  title: const Text('Account Frozen', style: TextStyle(color: Colors.white, fontSize: 14)),
+                  title: const Text(
+                    'Account Frozen',
+                    style: TextStyle(color: Colors.white, fontSize: 14),
+                  ),
                   value: _isFrozen,
                   activeColor: AppColors.luxGold,
                   onChanged: (v) => setDialogState(() => _isFrozen = v),
                 ),
                 SwitchListTile(
-                  title: const Text('Backup Services', style: TextStyle(color: Colors.white, fontSize: 14)),
+                  title: const Text(
+                    'Backup Services',
+                    style: TextStyle(color: Colors.white, fontSize: 14),
+                  ),
                   value: _backupGallery,
                   activeColor: AppColors.luxGold,
                   onChanged: (v) => setDialogState(() => _backupGallery = v),
@@ -225,10 +342,20 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                   child: Container(
                     width: double.infinity,
                     height: 50,
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), gradient: AppColors.luxGoldGradient),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      gradient: AppColors.luxGoldGradient,
+                    ),
                     child: Center(
-                        child: Text(employee == null ? 'ONBOARD EMPLOYEE' : 'UPDATE RECORD',
-                            style: const TextStyle(color: AppColors.luxDarkGreen, fontWeight: FontWeight.bold, letterSpacing: 1))),
+                      child: Text(
+                        employee == null ? 'ONBOARD EMPLOYEE' : 'UPDATE RECORD',
+                        style: const TextStyle(
+                          color: AppColors.luxDarkGreen,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -240,15 +367,28 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
   }
 
   Future<void> _handleSave(DocumentSnapshot? employee) async {
-    showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator(color: AppColors.luxGold)));
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(color: AppColors.luxGold),
+      ),
+    );
 
     try {
       String uid = employee?.id ?? '';
       String? photoUrl = _currentImageUrl;
 
       if (employee == null) {
-        FirebaseApp app = await Firebase.initializeApp(name: 'SecondaryApp', options: Firebase.app().options);
-        UserCredential cred = await FirebaseAuth.instanceFor(app: app).createUserWithEmailAndPassword(email: emailController.text, password: '123456');
+        FirebaseApp app = await Firebase.initializeApp(
+          name: 'SecondaryApp',
+          options: Firebase.app().options,
+        );
+        UserCredential cred = await FirebaseAuth.instanceFor(app: app)
+            .createUserWithEmailAndPassword(
+              email: emailController.text,
+              password: '123456',
+            );
         uid = cred.user!.uid;
         await app.delete();
       }
@@ -277,7 +417,9 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
       Navigator.pop(context); // Close dialog
     } catch (e) {
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error: $e")));
     }
   }
 
@@ -296,14 +438,20 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
         child: Container(
           width: 60,
           height: 60,
-          decoration: const BoxDecoration(shape: BoxShape.circle, gradient: AppColors.luxGoldGradient),
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: AppColors.luxGoldGradient,
+          ),
           child: const Icon(Icons.add, color: AppColors.luxDarkGreen),
         ),
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: usersRef.snapshots(),
         builder: (_, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: AppColors.luxGold));
+          if (!snapshot.hasData)
+            return const Center(
+              child: CircularProgressIndicator(color: AppColors.luxGold),
+            );
 
           return ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
@@ -318,28 +466,71 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.luxAccentGreen.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: AppColors.luxGold.withValues(alpha: frozen ? 0.1 : 0.2)),
-                ),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-                  leading: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.luxGold.withValues(alpha: 0.5))),
-                    child: CircleAvatar(
-                      backgroundColor: AppColors.luxAccentGreen,
-                      backgroundImage: data['photoUrl'] != null ? NetworkImage(data['photoUrl']) : null,
-                      child: data['photoUrl'] == null ? Text(data['name'][0], style: const TextStyle(color: AppColors.luxGold)) : null,
+                  border: Border.all(
+                    color: AppColors.luxGold.withValues(
+                      alpha: frozen ? 0.1 : 0.2,
                     ),
                   ),
-                  title: Text(data['name'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'serif')),
-                  subtitle: Text('${data['department']} • ${data['role'].toString().toUpperCase()}',
-                      style: TextStyle(color: AppColors.luxGold.withValues(alpha: 0.6), fontSize: 12)),
+                ),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 15,
+                    vertical: 5,
+                  ),
+                  leading: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.luxGold.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: CircleAvatar(
+                      backgroundColor: AppColors.luxAccentGreen,
+                      backgroundImage: data['photoUrl'] != null
+                          ? NetworkImage(data['photoUrl'])
+                          : null,
+                      child: data['photoUrl'] == null
+                          ? Text(
+                              data['name'][0],
+                              style: const TextStyle(color: AppColors.luxGold),
+                            )
+                          : null,
+                    ),
+                  ),
+                  title: Text(
+                    data['name'],
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'serif',
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${data['department']} • ${data['role'].toString().toUpperCase()}',
+                    style: TextStyle(
+                      color: AppColors.luxGold.withValues(alpha: 0.6),
+                      fontSize: 12,
+                    ),
+                  ),
                   trailing: PopupMenuButton(
                     icon: const Icon(Icons.more_vert, color: AppColors.luxGold),
                     color: AppColors.luxAccentGreen,
                     itemBuilder: (_) => [
-                      const PopupMenuItem(value: 'edit', child: Text('Edit Record', style: TextStyle(color: Colors.white))),
-                      const PopupMenuItem(value: 'delete', child: Text('Delete User', style: TextStyle(color: Colors.redAccent))),
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Text(
+                          'Edit Record',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Text(
+                          'Delete User',
+                          style: TextStyle(color: Colors.redAccent),
+                        ),
+                      ),
                     ],
                     onSelected: (v) {
                       if (v == 'edit') _openEmployeeDialog(employee: doc);

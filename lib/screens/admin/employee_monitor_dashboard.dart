@@ -271,26 +271,112 @@ class _ImagesTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('uploads').where('uid', isEqualTo: employeeId).snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('uploads')
+          .where('uid', isEqualTo: employeeId)
+          .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: AppColors.luxGold));
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator(color: AppColors.luxGold));
+        }
+
+        final docs = snapshot.data!.docs;
+
+        if (docs.isEmpty) {
+          return const Center(
+            child: Text("NO VISUAL LOGS FOUND", 
+              style: TextStyle(color: AppColors.luxGold, fontSize: 10, letterSpacing: 2)),
+          );
+        }
 
         return GridView.builder(
           padding: const EdgeInsets.all(20),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 12, mainAxisSpacing: 12),
-          itemCount: snapshot.data!.docs.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3, 
+            crossAxisSpacing: 12, 
+            mainAxisSpacing: 12,
+          ),
+          itemCount: docs.length,
           itemBuilder: (context, index) {
-            var data = snapshot.data!.docs[index];
-            return Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.luxGold.withValues(alpha: 0.3)),
-                image: DecorationImage(image: NetworkImage(data['url']), fit: BoxFit.cover),
+            var doc = docs[index];
+            var data = doc.data() as Map<String, dynamic>;
+            String imageUrl = data['url'] ?? '';
+
+            return GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => FullScreenImageViewer(
+                      imageUrl: imageUrl,
+                      heroTag: doc.id, // Unique tag for animation
+                    ),
+                  ),
+                );
+              },
+              child: Hero(
+                tag: doc.id,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.luxGold.withValues(alpha: 0.3)),
+                    image: DecorationImage(
+                      image: NetworkImage(imageUrl), 
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
               ),
             );
           },
         );
       },
+    );
+  }
+}
+
+class FullScreenImageViewer extends StatelessWidget {
+  final String imageUrl;
+  final String heroTag;
+
+  const FullScreenImageViewer({
+    Key? key,
+    required this.imageUrl,
+    required this.heroTag,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black, // Dark background for focus
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: AppColors.luxGold,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: Center(
+        child: Hero(
+          tag: heroTag,
+          child: InteractiveViewer(
+            panEnabled: true, // Set to false to prevent panning
+            boundaryMargin: const EdgeInsets.all(20),
+            minScale: 0.5,
+            maxScale: 4.0, // Maximum zoom level
+            child: Image.network(
+              imageUrl,
+              fit: BoxFit.contain,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return const Center(child: CircularProgressIndicator(color: AppColors.luxGold));
+              },
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

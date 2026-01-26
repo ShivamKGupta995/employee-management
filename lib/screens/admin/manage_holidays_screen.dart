@@ -1,5 +1,8 @@
+import 'dart:io'; // Required for File
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:excel/excel.dart' hide Border;
+import 'package:file_picker/file_picker.dart';
 import 'package:employee_system/config/constants/app_colors.dart';
 import 'package:employee_system/models/holiday_model.dart';
 import 'package:employee_system/services/holiday_service.dart';
@@ -15,6 +18,84 @@ class ManageHolidaysScreen extends StatefulWidget {
 class _ManageHolidaysScreenState extends State<ManageHolidaysScreen> {
   final HolidayService _service = HolidayService();
 
+  // ==========================================
+  // BULK EXCEL UPLOAD LOGIC
+  // ==========================================
+  Future<void> _handleBulkUpload() async {
+    try {
+      // 1. Pick File
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx'],
+      );
+
+      if (result == null) return;
+
+      // Show Loading Overlay
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator(color: AppColors.luxGold)),
+      );
+
+      // 2. Read Bytes and Decode Excel
+      var bytes = File(result.files.single.path!).readAsBytesSync();
+      var excel = Excel.decodeBytes(bytes);
+      List<HolidayModel> importedHolidays = [];
+
+      for (var table in excel.tables.keys) {
+        var rows = excel.tables[table]!.rows;
+        
+        // Skip index 0 (Header Row: Name | Date | Type)
+        for (int i = 1; i < rows.length; i++) {
+          var row = rows[i];
+          if (row[0] == null || row[1] == null) continue;
+
+          String name = row[0]!.value.toString();
+          
+          // Date Parsing Logic
+          DateTime date;
+          var dateVal = row[1]!.value;
+          if (dateVal is DateTime) {
+            date = dateVal as DateTime;
+          } else {
+            // Parses string format YYYY-MM-DD
+            date = DateTime.parse(dateVal.toString()); 
+          }
+
+          // Type defaults to Public if empty
+          String type = row[2]?.value?.toString() ?? 'Public';
+
+          importedHolidays.add(HolidayModel(
+            id: null, // Firestore will generate
+            name: name,
+            date: date,
+            type: type,
+          ));
+        }
+      }
+
+      // 3. Batch Save to Firestore
+      if (importedHolidays.isNotEmpty) {
+        await _service.bulkSaveHolidays(importedHolidays);
+        if (mounted) {
+          Navigator.pop(context); // Close loading dialog
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("SUCCESS: ${importedHolidays.length} entries registered.")),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) Navigator.pop(context); // Close loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("ERROR: Check Excel format (Name, Date, Type)")),
+      );
+    }
+  }
+
+  // ==========================================
+  // SINGLE ENTRY DIALOG
+  // ==========================================
   void _showHolidayDialog({HolidayModel? holiday}) {
     showDialog(
       context: context,
@@ -39,6 +120,15 @@ class _ManageHolidaysScreenState extends State<ManageHolidaysScreen> {
         foregroundColor: AppColors.luxGold,
         centerTitle: true,
         elevation: 0,
+        actions: [
+          // BULK ACTION BUTTON
+          IconButton(
+            icon: const Icon(Icons.drive_folder_upload_outlined, color: AppColors.luxGold),
+            onPressed: _handleBulkUpload,
+            tooltip: "Bulk Upload Excel",
+          ),
+          const SizedBox(width: 10),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showHolidayDialog(),

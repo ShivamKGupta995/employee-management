@@ -41,4 +41,17 @@ class HolidayService {
   Future<void> deleteHoliday(String id) async {
     await _ref.doc(id).delete();
   }
+
+  // Add this to your existing HolidayService class
+Future<void> bulkSaveHolidays(List<HolidayModel> holidays) async {
+  WriteBatch batch = FirebaseFirestore.instance.batch();
+
+  for (var holiday in holidays) {
+    // Generate a new document reference with an auto-ID
+    DocumentReference doc = _ref.doc(); 
+    batch.set(doc, holiday.toMap());
+  }
+
+  await batch.commit();
+}
 }
