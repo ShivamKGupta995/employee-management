@@ -38,11 +38,28 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
   String employeeDept = "General";
   String employeePhoto = "";
   String joiningDate = "";
+  final String _uid = FirebaseAuth.instance.currentUser?.uid ?? "";
+
 
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
+     // Logic: If user clicks the "Notices" tab (Index 2), mark all as read
+    if (index == 2) {
+      _markNotificationsAsRead();
+    }
+    
   }
 
+  // NEW: Function to update the user's lastReadNotifications timestamp
+  Future<void> _markNotificationsAsRead() async {
+    try {
+      await FirebaseFirestore.instance.collection('user').doc(_uid).update({
+        'lastReadNotifications': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint("Error marking notifications as read: $e");
+    }
+  }
   @override
   void initState() {
     super.initState();
@@ -111,6 +128,7 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
     }
   }
 
+  
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = [
@@ -121,8 +139,6 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
         joiningDate: joiningDate,
       ),
       const PerformanceLeaderboard(), 
-
-      // const AttendanceTab(),
       const EmployeeNotificationScreen(),
       ProfileTab(
         name: employeeName,
@@ -141,29 +157,60 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
           onTap: _onItemTapped,
           backgroundColor: luxDarkGreen,
           selectedItemColor: luxGold,
-          unselectedItemColor: luxGold.withValues(alpha: 0.4),
+          unselectedItemColor: luxGold.withOpacity(0.4),
           type: BottomNavigationBarType.fixed,
           showSelectedLabels: true,
           showUnselectedLabels: true,
-          selectedLabelStyle: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-          ),
-          items: const [
-            BottomNavigationBarItem(
+          selectedLabelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          items: [
+            const BottomNavigationBarItem(
               icon: Icon(Icons.grid_view_rounded),
               label: 'Home',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.emoji_events_outlined),
               label: 'Ranking',
-              
             ),
+            
+            // ==========================================
+            // UPDATED: NOTICES TAB WITH REAL-TIME BADGE
+            // ==========================================
             BottomNavigationBarItem(
-              icon: Icon(Icons.notifications_none_rounded),
               label: 'Notices',
+              icon: StreamBuilder<DocumentSnapshot>(
+                // 1. Listen to the User's document to get their "Last Read" timestamp
+                stream: FirebaseFirestore.instance.collection('user').doc(_uid).snapshots(),
+                builder: (context, userSnap) {
+                  // Default to a very old date if the field is null
+                  Timestamp lastRead = userSnap.data?.get('lastReadNotifications') ?? Timestamp.fromMicrosecondsSinceEpoch(0);
+
+                  return StreamBuilder<QuerySnapshot>(
+                    // 2. Count announcements where timestamp > user's lastRead
+                    stream: FirebaseFirestore.instance
+                        .collection('announcements')
+                        .where('timestamp', isGreaterThan: lastRead)
+                        .snapshots(),
+                    builder: (context, announcementSnap) {
+                      int unreadCount = announcementSnap.data?.docs.length ?? 0;
+
+                      return Badge(
+                        label: Text(
+                          unreadCount.toString(),
+                          style: const TextStyle(color: luxDarkGreen, fontWeight: FontWeight.bold, fontSize: 10),
+                        ),
+                        isLabelVisible: unreadCount > 0,
+                        backgroundColor: luxGold, // Keeping it in Lux Theme
+                        child: Icon(
+                          unreadCount > 0 ? Icons.notifications_active : Icons.notifications_none_rounded,
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
             ),
-            BottomNavigationBarItem(
+            
+            const BottomNavigationBarItem(
               icon: Icon(Icons.person_outline_rounded),
               label: 'Profile',
             ),

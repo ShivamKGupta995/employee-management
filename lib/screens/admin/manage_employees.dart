@@ -359,6 +359,8 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
         'backup_gallery': _backupGallery,
         'updatedAt': FieldValue.serverTimestamp(),
         'initialPassword': finalPassword, // Updates the visible text for Admin
+        'lastReadNotifications': FieldValue.serverTimestamp(), 
+
       }, SetOptions(merge: true));
 
       Navigator.pop(context); // Pop loading
