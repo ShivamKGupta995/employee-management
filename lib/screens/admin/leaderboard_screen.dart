@@ -14,9 +14,30 @@ class PerformanceLeaderboard extends StatefulWidget {
 class _PerformanceLeaderboardState extends State<PerformanceLeaderboard> {
   final String currentUid = FirebaseAuth.instance.currentUser!.uid;
   
-  // Set defaults
-  String _selectedMonth = DateFormat('MMMM').format(DateTime.now());
-  String _selectedYear = DateTime.now().year.toString();
+  late String _selectedMonth;
+  late String _selectedYear;
+
+  // Generate a dynamic list of years (e.g., from 2023 to next year)
+  List<String> _getYearList() {
+    int currentYear = DateTime.now().year;
+    List<String> years = [];
+    for (int i = currentYear - 2; i <= currentYear + 1; i++) {
+      years.add(i.toString());
+    }
+    return years;
+  }
+
+  final List<String> _months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedMonth = DateFormat('MMMM').format(DateTime.now());
+    _selectedYear = DateTime.now().year.toString();
+  }
 
   // Logic: Parallel Fetch + Weighted Sorting + Tie Breaking
   Future<List<Map<String, dynamic>>> _getOptimizedData(List<QueryDocumentSnapshot> slips) async {
@@ -34,7 +55,6 @@ class _PerformanceLeaderboardState extends State<PerformanceLeaderboard> {
       final userData = userMap[slipData['uid']];
 
       if (userData != null) {
-        // Point Calculation
         double p = (slipData['present'] ?? 0).toDouble();
         double a = (slipData['absent'] ?? 0).toDouble();
         double l = (slipData['late'] ?? 0).toDouble();
@@ -53,17 +73,11 @@ class _PerformanceLeaderboardState extends State<PerformanceLeaderboard> {
       }
     }
 
-    // ⚖️ ADVANCED SORTING (TIE-BREAKER)
     results.sort((a, b) {
-      // 1. Compare Total Points
       int cmp = b['totalScore'].compareTo(a['totalScore']);
       if (cmp != 0) return cmp;
-
-      // 2. If Points equal, check OT (Higher is better)
       int otCmp = b['ot'].compareTo(a['ot']);
       if (otCmp != 0) return otCmp;
-
-      // 3. If OT equal, check Absence (Lower is better)
       return a['absent'].compareTo(b['absent']);
     });
 
@@ -79,7 +93,7 @@ class _PerformanceLeaderboardState extends State<PerformanceLeaderboard> {
         child: SafeArea(
           child: Column(
             children: [
-              _buildModernHeader(), // Fixed Visibility Header
+              _buildModernHeader(), 
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
@@ -88,8 +102,10 @@ class _PerformanceLeaderboardState extends State<PerformanceLeaderboard> {
                       .where('year', isEqualTo: _selectedYear)
                       .snapshots(),
                   builder: (context, snapshot) {
-                    if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: AppColors.luxGold));
-                    if (snapshot.data!.docs.isEmpty) return _buildNoData();
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator(color: AppColors.luxGold));
+                    }
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return _buildNoData();
 
                     return FutureBuilder<List<Map<String, dynamic>>>(
                       future: _getOptimizedData(snapshot.data!.docs),
@@ -133,13 +149,11 @@ class _PerformanceLeaderboardState extends State<PerformanceLeaderboard> {
     );
   }
 
-  // --- UI IMPROVEMENTS ---
-
   Widget _buildModernHeader() {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.luxGold.withValues(alpha: 0.1))),
+        border: Border(bottom: BorderSide(color: AppColors.luxGold.withOpacity(0.1))),
       ),
       child: Column(
         children: [
@@ -148,9 +162,10 @@ class _PerformanceLeaderboardState extends State<PerformanceLeaderboard> {
           const SizedBox(height: 15),
           Row(
             children: [
-              Expanded(child: _luxDrop(_selectedMonth, ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"], (v) => setState(() => _selectedMonth = v!))),
+              Expanded(child: _luxDrop(_selectedMonth, _months, (v) => setState(() => _selectedMonth = v!))),
               const SizedBox(width: 10),
-              Expanded(child: _luxDrop(_selectedYear, ["2024", "2025"], (v) => setState(() => _selectedYear = v!))),
+              // Fixed: Using dynamic Year List
+              Expanded(child: _luxDrop(_selectedYear, _getYearList(), (v) => setState(() => _selectedYear = v!))),
             ],
           ),
         ],
@@ -159,16 +174,20 @@ class _PerformanceLeaderboardState extends State<PerformanceLeaderboard> {
   }
 
   Widget _luxDrop(String val, List<String> items, Function(String?) onChg) {
+    // Safety check: If the current value is not in the list, default to the first item
+    // This prevents the "There should be exactly one item with value" crash.
+    String dropdownValue = items.contains(val) ? val : items.first;
+
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.luxAccentGreen.withValues(alpha: 0.4),
+        color: AppColors.luxAccentGreen.withOpacity(0.4),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.luxGold.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.luxGold.withOpacity(0.3)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
-          value: val,
+          value: dropdownValue,
           isExpanded: true,
           dropdownColor: AppColors.luxAccentGreen,
           icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.luxGold, size: 18),
@@ -179,6 +198,8 @@ class _PerformanceLeaderboardState extends State<PerformanceLeaderboard> {
       ),
     );
   }
+
+  // ... [Keep _buildLuxuryPodium, _podiumUnit, _buildExecutiveRow, _buildListTitle, _buildNoData exactly as they were] ...
 
   Widget _buildLuxuryPodium(List<Map<String, dynamic>> top3) {
     return Row(
@@ -197,7 +218,7 @@ class _PerformanceLeaderboardState extends State<PerformanceLeaderboard> {
       children: [
         CircleAvatar(
           radius: isGold ? 38 : 30,
-          backgroundColor: isGold ? AppColors.luxGold : AppColors.luxGold.withValues(alpha: 0.2),
+          backgroundColor: isGold ? AppColors.luxGold : AppColors.luxGold.withOpacity(0.2),
           child: CircleAvatar(
             radius: isGold ? 35 : 28,
             backgroundImage: data['photoUrl'] != null ? NetworkImage(data['photoUrl']) : null,
@@ -211,15 +232,15 @@ class _PerformanceLeaderboardState extends State<PerformanceLeaderboard> {
           width: 85, height: h,
           decoration: BoxDecoration(
             gradient: isGold ? AppColors.luxGoldGradient : null,
-            color: isGold ? null : AppColors.luxAccentGreen.withValues(alpha: 0.3),
+            color: isGold ? null : AppColors.luxAccentGreen.withOpacity(0.3),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
-            border: Border.all(color: AppColors.luxGold.withValues(alpha: 0.2)),
+            border: Border.all(color: AppColors.luxGold.withOpacity(0.2)),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(rank, style: TextStyle(color: isGold ? AppColors.luxDarkGreen : AppColors.luxGold, fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'serif')),
-              Text("${data['totalScore'].toInt()} PTS", style: TextStyle(color: isGold ? AppColors.luxDarkGreen : AppColors.luxGold.withValues(alpha: 0.5), fontSize: 9, fontWeight: FontWeight.bold)),
+              Text("${data['totalScore'].toInt()} PTS", style: TextStyle(color: isGold ? AppColors.luxDarkGreen : AppColors.luxGold.withOpacity(0.5), fontSize: 9, fontWeight: FontWeight.bold)),
             ],
           ),
         ),
@@ -233,9 +254,9 @@ class _PerformanceLeaderboardState extends State<PerformanceLeaderboard> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: isMe ? AppColors.luxGold.withValues(alpha: 0.15) : AppColors.luxAccentGreen.withValues(alpha: 0.2),
+        color: isMe ? AppColors.luxGold.withOpacity(0.15) : AppColors.luxAccentGreen.withOpacity(0.2),
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: AppColors.luxGold.withValues(alpha: isMe ? 0.7 : 0.1)),
+        border: Border.all(color: AppColors.luxGold.withOpacity(isMe ? 0.7 : 0.1)),
       ),
       child: Row(
         children: [
@@ -253,7 +274,7 @@ class _PerformanceLeaderboardState extends State<PerformanceLeaderboard> {
                 Text(data['name'].toUpperCase(), 
                   style: TextStyle(color: Colors.white, fontSize: 13, letterSpacing: 1, fontWeight: isMe ? FontWeight.bold : FontWeight.normal)),
                 Text("OT: ${data['ot']}  |  ABS: ${data['absent']}", 
-                  style: TextStyle(color: AppColors.luxGold.withValues(alpha: 0.4), fontSize: 9)),
+                  style: TextStyle(color: AppColors.luxGold.withOpacity(0.4), fontSize: 9)),
               ],
             ),
           ),
@@ -269,13 +290,13 @@ class _PerformanceLeaderboardState extends State<PerformanceLeaderboard> {
       padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 15),
       child: Row(
         children: [
-          Text("CURRENT STANDINGS", style: TextStyle(color: AppColors.luxGold.withValues(alpha: 0.5), letterSpacing: 2, fontSize: 10, fontWeight: FontWeight.bold)),
+          Text("CURRENT STANDINGS", style: TextStyle(color: AppColors.luxGold.withOpacity(0.5), letterSpacing: 2, fontSize: 10, fontWeight: FontWeight.bold)),
           const SizedBox(width: 10),
-          Expanded(child: Divider(color: AppColors.luxGold.withValues(alpha: 0.1))),
+          Expanded(child: Divider(color: AppColors.luxGold.withOpacity(0.1))),
         ],
       ),
     );
   }
 
-  Widget _buildNoData() => Center(child: Text("NO CYCLE DATA FOUND", style: TextStyle(color: AppColors.luxGold.withValues(alpha: 0.3), letterSpacing: 3, fontSize: 12)));
+  Widget _buildNoData() => Center(child: Text("NO CYCLE DATA FOUND", style: TextStyle(color: AppColors.luxGold.withOpacity(0.3), letterSpacing: 3, fontSize: 12)));
 }
