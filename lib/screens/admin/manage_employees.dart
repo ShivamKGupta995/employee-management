@@ -5,7 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:employee_system/config/constants/app_colors.dart'; // Ensure path is correct
+import 'package:employee_system/config/constants/app_colors.dart'; 
+import 'package:cloud_functions/cloud_functions.dart'; // Add import
+
 
 class ManageEmployeesScreen extends StatefulWidget {
   const ManageEmployeesScreen({Key? key}) : super(key: key);
@@ -15,46 +17,14 @@ class ManageEmployeesScreen extends StatefulWidget {
 }
 
 class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
-  final CollectionReference usersRef = FirebaseFirestore.instance.collection(
-    'user',
-  );
+  final CollectionReference usersRef = FirebaseFirestore.instance.collection('user');
   final Reference storageRef = FirebaseStorage.instance.ref();
 
   final List<String> roleList = ['admin', 'employee'];
-  final List<String> departmentList = [
-    'HR',
-    'Finance',
-    'Engineering',
-    'Sales',
-    'Marketing',
-    'General',
-  ];
-  List<String> dynamicDepartments = ['General']; // Default value
+  List<String> dynamicDepartments = ['General']; 
 
-  @override
-  void initState() {
-    super.initState();
-    _listenToDepartments();
-  }
-
-  void _listenToDepartments() {
-    FirebaseFirestore.instance.collection('departments').snapshots().listen((
-      snapshot,
-    ) {
-      if (snapshot.docs.isNotEmpty) {
-        setState(() {
-          dynamicDepartments = snapshot.docs
-              .map((doc) => doc['name'] as String)
-              .toList();
-          // Ensure 'General' is always an option if you want
-          if (!dynamicDepartments.contains('General')) {
-            dynamicDepartments.add('General');
-          }
-        });
-      }
-    });
-  }
-
+  // Initializing Controllers
+  final TextEditingController passwordController = TextEditingController();
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
@@ -62,7 +32,6 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
   final TextEditingController joiningDateController = TextEditingController();
   final TextEditingController anniversaryController = TextEditingController();
 
-  // Local state for the dialog
   String _selectedDept = 'General';
   String _selectedRole = 'employee';
   bool _isFrozen = false;
@@ -71,6 +40,25 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
   String? _currentImageUrl;
 
   final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    _listenToDepartments();
+  }
+
+  void _listenToDepartments() {
+    FirebaseFirestore.instance.collection('departments').snapshots().listen((snapshot) {
+      if (snapshot.docs.isNotEmpty) {
+        setState(() {
+          dynamicDepartments = snapshot.docs.map((doc) => doc['name'] as String).toList();
+          if (!dynamicDepartments.contains('General')) {
+            dynamicDepartments.add('General');
+          }
+        });
+      }
+    });
+  }
 
   // ==========================================
   // UI HELPERS
@@ -106,7 +94,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
   );
 
   // ==========================================
-  // LOGIC (ORIGINAL LOGIC PRESERVED)
+  // LOGIC
   // ==========================================
 
   Future<void> _pickImage(StateSetter setState) async {
@@ -116,10 +104,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
     }
   }
 
-  Future<void> _selectDate(
-    BuildContext context,
-    TextEditingController controller,
-  ) async {
+  Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
     DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -137,8 +122,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
       ),
     );
     if (picked != null) {
-      controller.text =
-          "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+      controller.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
     }
   }
 
@@ -156,6 +140,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
     _selectedImage = null;
     if (employee != null) {
       final data = employee.data() as Map<String, dynamic>;
+      // FIX: Use .text for assignment to avoid type errors
       nameController.text = data['name'] ?? '';
       emailController.text = data['email'] ?? '';
       phoneController.text = data['phone'] ?? '';
@@ -167,6 +152,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
       _isFrozen = data['isFrozen'] ?? false;
       _backupGallery = data['backup_gallery'] ?? false;
       _currentImageUrl = data['photoUrl'];
+      passwordController.text = data['initialPassword'] ?? ''; 
     } else {
       nameController.clear();
       emailController.clear();
@@ -179,6 +165,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
       _isFrozen = false;
       _backupGallery = false;
       _currentImageUrl = null;
+      passwordController.text = "123456"; // Default password
     }
 
     showDialog(
@@ -193,48 +180,27 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
           title: Text(
             employee == null ? 'NEW ONBOARDING' : 'EDIT CREDENTIALS',
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.luxGold,
-              letterSpacing: 2,
-              fontSize: 16,
-              fontFamily: 'serif',
-            ),
+            style: const TextStyle(color: AppColors.luxGold, letterSpacing: 2, fontSize: 16, fontFamily: 'serif'),
           ),
           content: SingleChildScrollView(
             child: Column(
               children: [
                 const SizedBox(height: 10),
-                // Avatar Picker
                 Center(
                   child: Stack(
                     alignment: Alignment.bottomRight,
                     children: [
                       Container(
                         padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppColors.luxGold,
-                            width: 1,
-                          ),
-                        ),
+                        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.luxGold, width: 1)),
                         child: CircleAvatar(
                           radius: 50,
                           backgroundColor: AppColors.luxAccentGreen,
                           backgroundImage: _selectedImage != null
                               ? FileImage(_selectedImage!)
-                              : (_currentImageUrl != null
-                                        ? NetworkImage(_currentImageUrl!)
-                                        : null)
-                                    as ImageProvider?,
-                          child:
-                              (_selectedImage == null &&
-                                  _currentImageUrl == null)
-                              ? const Icon(
-                                  Icons.person,
-                                  size: 40,
-                                  color: AppColors.luxGold,
-                                )
+                              : (_currentImageUrl != null ? NetworkImage(_currentImageUrl!) : null) as ImageProvider?,
+                          child: (_selectedImage == null && _currentImageUrl == null)
+                              ? const Icon(Icons.person, size: 40, color: AppColors.luxGold)
                               : null,
                         ),
                       ),
@@ -243,11 +209,7 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                         child: const CircleAvatar(
                           radius: 16,
                           backgroundColor: AppColors.luxGold,
-                          child: Icon(
-                            Icons.edit,
-                            size: 14,
-                            color: AppColors.luxDarkGreen,
-                          ),
+                          child: Icon(Icons.edit, size: 14, color: AppColors.luxDarkGreen),
                         ),
                       ),
                     ],
@@ -255,53 +217,32 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                 ),
 
                 sectionTitle('Identity'),
+                TextField(controller: nameController, style: const TextStyle(color: Colors.white), decoration: _luxInput('Full Name')),
+                const SizedBox(height: 15),
+                TextField(controller: emailController, enabled: employee == null, style: const TextStyle(color: Colors.white), decoration: _luxInput('Email Address')),
+                const SizedBox(height: 15),
+                // Custom Password Field
                 TextField(
-                  controller: nameController,
+                  controller: passwordController,
+                  obscureText: false, 
                   style: const TextStyle(color: Colors.white),
-                  decoration: _luxInput('Full Name'),
+                  decoration: _luxInput('Account Password (Default: 123456)'),
                 ),
                 const SizedBox(height: 15),
-                TextField(
-                  controller: emailController,
-                  enabled: employee == null,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: _luxInput('Email Address'),
-                ),
-                const SizedBox(height: 15),
-                TextField(
-                  controller: phoneController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: _luxInput('Contact Number'),
-                ),
+                TextField(controller: phoneController, style: const TextStyle(color: Colors.white), decoration: _luxInput('Contact Number')),
 
                 sectionTitle('Schedules'),
-                TextField(
-                  controller: dobController,
-                  readOnly: true,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: _luxInput('Birth Date'),
-                  onTap: () => _selectDate(context, dobController),
-                ),
+                TextField(controller: dobController, readOnly: true, style: const TextStyle(color: Colors.white), decoration: _luxInput('Birth Date'), onTap: () => _selectDate(context, dobController)),
                 const SizedBox(height: 15),
-                TextField(
-                  controller: joiningDateController,
-                  readOnly: true,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: _luxInput('Joining Date'),
-                  onTap: () => _selectDate(context, joiningDateController),
-                ),
+                TextField(controller: joiningDateController, readOnly: true, style: const TextStyle(color: Colors.white), decoration: _luxInput('Joining Date'), onTap: () => _selectDate(context, joiningDateController)),
 
                 sectionTitle('Compliance'),
                 DropdownButtonFormField<String>(
-                  value: dynamicDepartments.contains(_selectedDept)
-                      ? _selectedDept
-                      : dynamicDepartments.first, // Safety check
+                  value: dynamicDepartments.contains(_selectedDept) ? _selectedDept : dynamicDepartments.first,
                   dropdownColor: AppColors.luxAccentGreen,
                   style: const TextStyle(color: Colors.white),
                   decoration: _luxInput('Department'),
-                  items: dynamicDepartments
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                      .toList(),
+                  items: dynamicDepartments.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
                   onChanged: (v) => setDialogState(() => _selectedDept = v!),
                 ),
                 const SizedBox(height: 15),
@@ -310,27 +251,19 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                   dropdownColor: AppColors.luxAccentGreen,
                   style: const TextStyle(color: Colors.white),
                   decoration: _luxInput('System Role'),
-                  items: roleList
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                      .toList(),
+                  items: roleList.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
                   onChanged: (v) => setDialogState(() => _selectedRole = v!),
                 ),
 
                 sectionTitle('Permissions'),
                 SwitchListTile(
-                  title: const Text(
-                    'Account Frozen',
-                    style: TextStyle(color: Colors.white, fontSize: 14),
-                  ),
+                  title: const Text('Account Frozen', style: TextStyle(color: Colors.white, fontSize: 14)),
                   value: _isFrozen,
                   activeColor: AppColors.luxGold,
                   onChanged: (v) => setDialogState(() => _isFrozen = v),
                 ),
                 SwitchListTile(
-                  title: const Text(
-                    'Backup Services',
-                    style: TextStyle(color: Colors.white, fontSize: 14),
-                  ),
+                  title: const Text('Backup Services', style: TextStyle(color: Colors.white, fontSize: 14)),
                   value: _backupGallery,
                   activeColor: AppColors.luxGold,
                   onChanged: (v) => setDialogState(() => _backupGallery = v),
@@ -342,18 +275,11 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                   child: Container(
                     width: double.infinity,
                     height: 50,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      gradient: AppColors.luxGoldGradient,
-                    ),
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), gradient: AppColors.luxGoldGradient),
                     child: Center(
                       child: Text(
                         employee == null ? 'ONBOARD EMPLOYEE' : 'UPDATE RECORD',
-                        style: const TextStyle(
-                          color: AppColors.luxDarkGreen,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1,
-                        ),
+                        style: const TextStyle(color: AppColors.luxDarkGreen, fontWeight: FontWeight.bold, letterSpacing: 1),
                       ),
                     ),
                   ),
@@ -366,7 +292,8 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
     );
   }
 
-  Future<void> _handleSave(DocumentSnapshot? employee) async {
+ Future<void> _handleSave(DocumentSnapshot? employee) async {
+    // Show loading indicator
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -378,30 +305,50 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
     try {
       String uid = employee?.id ?? '';
       String? photoUrl = _currentImageUrl;
+      
+      // If password field is empty, default to 123456 for new users. 
+      // For existing users, this would re-set their password to 123456.
+      String finalPassword = passwordController.text.trim().isEmpty 
+          ? '123456' 
+          : passwordController.text.trim();
 
+      // --- CASE 1: UPDATING EXISTING USER AUTH PASSWORD ---
+      if (employee != null) {
+        // Call the Cloud Function we added to your index.js
+        HttpsCallable callable = FirebaseFunctions.instance.httpsCallable('adminUpdateUserPassword');
+        
+        await callable.call({
+          'targetUid': uid,
+          'newPassword': finalPassword,
+        });
+        // Logic: The Cloud Function just updated the actual login password in Firebase Auth.
+      }
+
+      // --- CASE 2: CREATING NEW USER AUTH ACCOUNT ---
       if (employee == null) {
         FirebaseApp app = await Firebase.initializeApp(
           name: 'SecondaryApp',
           options: Firebase.app().options,
         );
-        UserCredential cred = await FirebaseAuth.instanceFor(app: app)
-            .createUserWithEmailAndPassword(
-              email: emailController.text,
-              password: '123456',
-            );
+        UserCredential cred = await FirebaseAuth.instanceFor(app: app).createUserWithEmailAndPassword(
+          email: emailController.text.trim(),
+          password: finalPassword,
+        );
         uid = cred.user!.uid;
         await app.delete();
       }
 
+      // --- IMAGE UPLOAD LOGIC ---
       if (_selectedImage != null) {
         photoUrl = await _uploadImageToStorage(uid, _selectedImage!);
       }
 
+      // --- UPDATE FIRESTORE RECORD ---
       await usersRef.doc(uid).set({
         'uid': uid,
-        'name': nameController.text,
-        'email': emailController.text,
-        'phone': phoneController.text,
+        'name': nameController.text.trim(),
+        'email': emailController.text.trim(),
+        'phone': phoneController.text.trim(),
         'department': _selectedDept,
         'role': _selectedRole,
         'dob': dobController.text,
@@ -411,21 +358,22 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
         'isFrozen': _isFrozen,
         'backup_gallery': _backupGallery,
         'updatedAt': FieldValue.serverTimestamp(),
+        'initialPassword': finalPassword, // Updates the visible text for Admin
       }, SetOptions(merge: true));
 
-      Navigator.pop(context); // Close loading
-      Navigator.pop(context); // Close dialog
+      Navigator.pop(context); // Pop loading
+      Navigator.pop(context); // Pop dialog
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(employee == null ? "✅ Employee Onboarded" : "✅ Credentials Updated Successfully"))
+      );
     } catch (e) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Error: $e")));
+      Navigator.pop(context); // Pop loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+      );
     }
   }
-
-  // ==========================================
-  // LIST UI
-  // ==========================================
 
   @override
   Widget build(BuildContext context) {
@@ -436,22 +384,15 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         child: Container(
-          width: 60,
-          height: 60,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: AppColors.luxGoldGradient,
-          ),
+          width: 60, height: 60,
+          decoration: const BoxDecoration(shape: BoxShape.circle, gradient: AppColors.luxGoldGradient),
           child: const Icon(Icons.add, color: AppColors.luxDarkGreen),
         ),
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: usersRef.snapshots(),
         builder: (_, snapshot) {
-          if (!snapshot.hasData)
-            return const Center(
-              child: CircularProgressIndicator(color: AppColors.luxGold),
-            );
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: AppColors.luxGold));
 
           return ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
@@ -466,71 +407,23 @@ class _ManageEmployeesScreenState extends State<ManageEmployeesScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.luxAccentGreen.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(15),
-                  border: Border.all(
-                    color: AppColors.luxGold.withValues(
-                      alpha: frozen ? 0.1 : 0.2,
-                    ),
-                  ),
+                  border: Border.all(color: AppColors.luxGold.withValues(alpha: frozen ? 0.1 : 0.2)),
                 ),
                 child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 15,
-                    vertical: 5,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.luxAccentGreen,
+                    backgroundImage: data['photoUrl'] != null ? NetworkImage(data['photoUrl']) : null,
+                    child: data['photoUrl'] == null ? Text(data['name'][0], style: const TextStyle(color: AppColors.luxGold)) : null,
                   ),
-                  leading: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppColors.luxGold.withValues(alpha: 0.5),
-                      ),
-                    ),
-                    child: CircleAvatar(
-                      backgroundColor: AppColors.luxAccentGreen,
-                      backgroundImage: data['photoUrl'] != null
-                          ? NetworkImage(data['photoUrl'])
-                          : null,
-                      child: data['photoUrl'] == null
-                          ? Text(
-                              data['name'][0],
-                              style: const TextStyle(color: AppColors.luxGold),
-                            )
-                          : null,
-                    ),
-                  ),
-                  title: Text(
-                    data['name'],
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'serif',
-                    ),
-                  ),
-                  subtitle: Text(
-                    '${data['department']} • ${data['role'].toString().toUpperCase()}',
-                    style: TextStyle(
-                      color: AppColors.luxGold.withValues(alpha: 0.6),
-                      fontSize: 12,
-                    ),
-                  ),
+                  title: Text(data['name'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'serif')),
+                  subtitle: Text('${data['department']} • ${data['role'].toString().toUpperCase()}', style: TextStyle(color: AppColors.luxGold.withValues(alpha: 0.6), fontSize: 12)),
                   trailing: PopupMenuButton(
                     icon: const Icon(Icons.more_vert, color: AppColors.luxGold),
                     color: AppColors.luxAccentGreen,
                     itemBuilder: (_) => [
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Text(
-                          'Edit Record',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Text(
-                          'Delete User',
-                          style: TextStyle(color: Colors.redAccent),
-                        ),
-                      ),
+                      const PopupMenuItem(value: 'edit', child: Text('Edit Record', style: TextStyle(color: Colors.white))),
+                      const PopupMenuItem(value: 'delete', child: Text('Delete User', style: TextStyle(color: Colors.redAccent))),
                     ],
                     onSelected: (v) {
                       if (v == 'edit') _openEmployeeDialog(employee: doc);

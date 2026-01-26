@@ -1,5 +1,7 @@
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { onCall, HttpsError } = require("firebase-functions/v2/https"); // Add this line
+
 
 const admin = require("firebase-admin");
 const { initializeApp } = require("firebase-admin/app");
@@ -170,3 +172,51 @@ exports.sendCelebrationNotifications = onSchedule(
     console.log("✅ Celebration notifications completed");
   }
 );
+
+
+
+// ======================================================
+// 4️⃣ 🔐 DIRECT ADMIN PASSWORD CHANGE
+// ======================================================
+exports.adminUpdateUserPassword = onCall(async (request) => {
+  // 1. Verify the caller is logged in
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in.");
+  }
+
+  // 2. Verify the caller is an Admin (Checking your Firestore 'user' collection)
+  const callerId = request.auth.uid;
+  const callerDoc = await admin.firestore().collection("user").doc(callerId).get();
+  
+  if (!callerDoc.exists || callerDoc.data().role !== "admin") {
+    throw new HttpsError("permission-denied", "Only admins can change passwords.");
+  }
+
+  // 3. Get the data sent from Flutter
+  const targetUid = request.data.targetUid;
+  const newPassword = request.data.newPassword;
+
+  if (!targetUid || !newPassword || newPassword.length < 6) {
+    throw new HttpsError("invalid-argument", "Password must be at least 6 characters.");
+  }
+
+  try {
+    // 4. Directly update the user's password in Firebase Authentication
+    await admin.auth().updateUser(targetUid, {
+      password: newPassword,
+    });
+
+    // 5. Optional: Update the 'initialPassword' in Firestore so the admin sees the current one
+    await admin.firestore().collection("user").doc(targetUid).update({
+      initialPassword: newPassword,
+      passwordLastChangedByAdmin: true,
+    });
+    
+
+    console.log(`✅ Password changed for user: ${targetUid}`);
+    return { success: true, message: "Password updated successfully." };
+  } catch (error) {
+    console.error("Error updating password:", error);
+    throw new HttpsError("internal", error.message);
+  }
+});
